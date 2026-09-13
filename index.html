@@ -31,7 +31,7 @@
   a{color:var(--green-deep);}
 
   .sticky-top{position:sticky;top:0;z-index:15;}
-  header.top{background:var(--green);color:#fff;padding:1.1rem 9.5rem 1rem 1rem;border-bottom:3px solid var(--green-deep);}
+  header.top{background:var(--green);color:#fff;padding:1.1rem 12.3rem 1rem 1rem;border-bottom:3px solid var(--green-deep);}
   header.top .eyebrow{font-size:12.5px;color:#CFEAD9;margin:0 0 6px;}
   header.top h1{font-size:20px;font-weight:700;margin:0;border:none;background:none;color:#fff;padding:0;display:inline;}
   header.top .sub{font-size:13px;color:#DCEFE3;margin:2px 0 8px;}
@@ -139,6 +139,13 @@
   .modal .modal-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:.6rem;}
   .modal .status-msg{font-size:12.5px;margin-top:.5rem;}
   .modal .mini-label-share{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:.2rem 0 .3rem;}
+  .palette-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:.6rem 0;}
+  .palette-swatch{border:2px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;background:var(--paper);
+    text-align:left;font-family:inherit;}
+  .palette-swatch.active{border-color:var(--green);}
+  .palette-swatch .dots{display:flex;gap:5px;margin-bottom:7px;}
+  .palette-swatch .dots span{width:18px;height:18px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.08);}
+  .palette-swatch .pname{font-size:13px;font-weight:700;color:var(--ink);}
   #syncNotice{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--paper);color:var(--ink);
     border:1px solid var(--line);border-left:4px solid var(--red);padding:12px 18px;border-radius:9px;
     box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:150;max-width:calc(100% - 32px);width:420px;font-size:13.5px;line-height:1.5;}
@@ -193,6 +200,7 @@
   <div class="sticky-top">
   <header class="top">
     <div class="header-actions">
+      <button type="button" class="theme-toggle" id="paletteToggle" title="Zmień paletę kolorów">🎨</button>
       <button type="button" class="theme-toggle" id="themeToggle" title="Przełącz motyw">🌙</button>
       <button type="button" class="fab" id="editToggle">✎ Edytuj</button>
     </div>
@@ -279,6 +287,17 @@
     <div id="shareBody"></div>
     <div class="modal-actions">
       <button class="btn" id="closeShareBtn">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="paletteModal">
+  <div class="modal">
+    <h3>Paleta kolorów</h3>
+    <p>Wybór dotyczy tylko tego urządzenia — nie zmienia danych eventu.</p>
+    <div class="palette-grid" id="paletteGrid"></div>
+    <div class="modal-actions">
+      <button class="btn" id="closePaletteBtn">Zamknij</button>
     </div>
   </div>
 </div>
@@ -1016,11 +1035,61 @@ function toggleTheme(){
   const isDark = document.body.classList.toggle("dark");
   try{ localStorage.setItem(THEME_KEY, isDark ? "dark" : "light"); }catch(e){}
   updateThemeIcon();
+  applyPalette(getPaletteId());
 }
 function updateThemeIcon(){
   document.getElementById("themeToggle").textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
 }
 document.getElementById("themeToggle").addEventListener("click", toggleTheme);
+
+// ---------------- paleta kolorów ----------------
+const PALETTE_KEY = "logistics-tool-palette";
+const PALETTES = {
+  ocean: { label:"Ocean", light:{bg:"#edf2f6",paper:"#ffffff",ink:"#152b3b",muted:"#647786",line:"#dbe4eb",soft:"#f6f9fb",green:"#176861","green-deep":"#104e48",lime:"#c4e987",amber:"#e9a445","amber-deep":"#81521c",red:"#b94746"},
+    dark:{bg:"#101b23",paper:"#192934",ink:"#eaf3f8",muted:"#a8bac7",line:"#304550",soft:"#15252f",green:"#1c7067","green-deep":"#b7eadb",lime:"#c4e987",amber:"#e9a445","amber-deep":"#f2cc82",red:"#ff9997"} },
+  las: { label:"Las", light:{bg:"#F7F5EE",paper:"#FFFFFF",ink:"#201F1B",muted:"#6E6C63",line:"#E4E1D6",soft:"#F2F0E8",green:"#0E6B44","green-deep":"#0A4E32",lime:"#D8E76B",amber:"#F2A93B","amber-deep":"#6B4708",red:"#C1462F"},
+    dark:{bg:"#14181B",paper:"#1E2327",ink:"#ECEAE2",muted:"#9B988D",line:"#323A3E",soft:"#171B1D",green:"#0E6B44","green-deep":"#0A4E32",lime:"#D8E76B",amber:"#F2A93B","amber-deep":"#F2C77A",red:"#E0665A"} },
+  terakota: { label:"Terakota", light:{bg:"#FBF3EC",paper:"#FFFFFF",ink:"#2E1C12",muted:"#8A6F5E",line:"#EAD9CB",soft:"#F7EDE4",green:"#C1622B","green-deep":"#8F4419",lime:"#F0C48A",amber:"#E9A445","amber-deep":"#7A4A16",red:"#B94746"},
+    dark:{bg:"#1C1512",paper:"#2A211C",ink:"#F5E9DF",muted:"#B8A290",line:"#4A3B31",soft:"#231B17",green:"#D97A44","green-deep":"#F0C9A8",lime:"#F0C48A",amber:"#E9A445","amber-deep":"#F2CC82",red:"#FF9997"} },
+  grafit: { label:"Grafit", light:{bg:"#EEF1F4",paper:"#FFFFFF",ink:"#1B222B",muted:"#5C6B79",line:"#DADFE4",soft:"#F5F7F9",green:"#2F5D8A","green-deep":"#203E5C",lime:"#9FCBE8",amber:"#E9A445","amber-deep":"#5C4213",red:"#B94746"},
+    dark:{bg:"#0F1620",paper:"#18212C",ink:"#E7EEF4",muted:"#8FA0B0",line:"#2B3846",soft:"#121A23",green:"#4E86B8","green-deep":"#BFE0F5",lime:"#9FCBE8",amber:"#E9A445","amber-deep":"#F2CC82",red:"#FF9997"} },
+};
+function getPaletteId(){
+  let id = null;
+  try{ id = localStorage.getItem(PALETTE_KEY); }catch(e){}
+  return (id && PALETTES[id]) ? id : "ocean";
+}
+function applyPalette(id){
+  const pal = PALETTES[id] || PALETTES.ocean;
+  const vars = document.body.classList.contains("dark") ? pal.dark : pal.light;
+  Object.keys(vars).forEach(k=>{ document.documentElement.style.setProperty("--"+k, vars[k]); });
+  try{ localStorage.setItem(PALETTE_KEY, id); }catch(e){}
+}
+function renderPaletteGrid(){
+  const grid = document.getElementById("paletteGrid");
+  grid.innerHTML = "";
+  const current = getPaletteId();
+  Object.entries(PALETTES).forEach(([id, pal])=>{
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "palette-swatch" + (id===current ? " active" : "");
+    const previewMode = document.body.classList.contains("dark") ? pal.dark : pal.light;
+    btn.innerHTML = '<span class="dots">'+
+      '<span style="background:'+previewMode.green+'"></span>'+
+      '<span style="background:'+previewMode.bg+'"></span>'+
+      '<span style="background:'+previewMode.amber+'"></span>'+
+      '</span><span class="pname">'+pal.label+'</span>';
+    btn.addEventListener("click", ()=>{ applyPalette(id); renderPaletteGrid(); });
+    grid.appendChild(btn);
+  });
+}
+const paletteModal = document.getElementById("paletteModal");
+document.getElementById("paletteToggle").addEventListener("click", ()=>{
+  renderPaletteGrid();
+  paletteModal.classList.add("show");
+});
+document.getElementById("closePaletteBtn").addEventListener("click", ()=>paletteModal.classList.remove("show"));
+paletteModal.addEventListener("click", (e)=>{ if(e.target===paletteModal) paletteModal.classList.remove("show"); });
 
 // ---------------- init ----------------
 document.addEventListener("focusout", ()=>{
@@ -1039,6 +1108,7 @@ document.addEventListener("focusout", ()=>{
 
 (function init(){
   loadTheme();
+  applyPalette(getPaletteId());
   loadState();
   handleIncomingHash();
   render();
