@@ -72,6 +72,7 @@
     background:var(--paper);color:var(--muted);cursor:pointer;}
   .filter-chip.active{background:var(--green);color:#fff;border-color:var(--green-deep);}
   body.edit-mode .filter-row{display:none;}
+  body.edit-mode #personFilter{display:none;}
 
   details.group{background:var(--paper);border:1px solid var(--line);border-radius:12px;margin-bottom:.6rem;overflow:hidden;}
   details.group[open]{border-color:#C9D8BC;}
@@ -144,6 +145,12 @@
   .palette-swatch .dots{display:flex;gap:5px;margin-bottom:7px;}
   .palette-swatch .dots span{width:18px;height:18px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.08);}
   .palette-swatch .pname{font-size:13px;font-weight:700;color:var(--ink);}
+  .history-list{max-height:50vh;overflow-y:auto;margin:.6rem 0;}
+  .history-item{padding:.55rem 0;border-top:1px solid var(--line);font-size:13.5px;}
+  .history-item:first-child{border-top:none;}
+  .history-item .hwhat{color:var(--ink);}
+  .history-item .hmeta{display:block;font-size:11.5px;color:var(--muted);margin-top:1px;}
+  .history-empty{color:var(--muted);font-size:13.5px;padding:1rem 0;text-align:center;}
   #syncNotice{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--paper);color:var(--ink);
     border:1px solid var(--line);border-left:4px solid var(--red);padding:12px 18px;border-radius:9px;
     box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:150;max-width:calc(100% - 32px);width:420px;font-size:13.5px;line-height:1.5;}
@@ -234,6 +241,7 @@
     <a href="#odbiory">Odbiory</a>
     <a href="#info">Info</a>
     <button type="button" class="chip-btn" id="shareBtn"><span aria-hidden="true">🔗</span><span>Udostępnij</span></button>
+    <button type="button" class="chip-btn" id="historyBtn"><span aria-hidden="true">🕘</span><span>Historia</span></button>
   </nav>
   </div>
 
@@ -248,14 +256,15 @@
   <div class="content-grid">
   <section id="sprzet">
     <h2 class="section-title">Sprzęt / rzeczy do zabrania</h2>
-    <p class="section-sub">Grupuj wg osoby odpowiedzialnej. Przełącz fazę na górze, żeby odhaczać załadunek albo rozładunek.</p>
+    <p class="section-sub">Grupuj wg magazynu. Przełącz fazę na górze, żeby odhaczać załadunek albo rozładunek.</p>
     <div class="filter-row" id="equipmentFilterRow">
       <button type="button" class="filter-chip active" data-filter="all">Wszystkie</button>
       <button type="button" class="filter-chip" data-filter="unchecked">Nieodhaczone</button>
       <button type="button" class="filter-chip" data-filter="unclear">Do ustalenia</button>
     </div>
+    <select class="field" id="personFilter" style="margin:0 0 .8rem;"></select>
     <div id="equipmentGroups"></div>
-    <div class="edit-only"><button class="btn" id="addGroupBtn">+ Dodaj grupę (osobę)</button></div>
+    <div class="edit-only"><button class="btn" id="addGroupBtn">+ Dodaj magazyn</button></div>
   </section>
 
   <div class="secondary-column">
@@ -300,6 +309,17 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="historyModal">
+  <div class="modal">
+    <h3>Historia zmian</h3>
+    <p>Ostatnie akcje w tym evencie (do 50 wpisów).</p>
+    <div id="historyBody" class="history-list"></div>
+    <div class="modal-actions">
+      <button class="btn" id="closeHistoryBtn">Zamknij</button>
+    </div>
+  </div>
+</div>
+
 <div id="syncNotice" role="status" aria-live="polite" hidden></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -332,7 +352,7 @@ function showNotice(message){
 function normalizeEvent(ev){
   if(!ev) return ev;
   const list = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v==="object" ? Object.values(v).filter(Boolean) : []);
-  ev.groups = list(ev.groups); ev.pickups = list(ev.pickups); ev.infoCards = list(ev.infoCards);
+  ev.groups = list(ev.groups); ev.pickups = list(ev.pickups); ev.infoCards = list(ev.infoCards); ev.history = list(ev.history);
   [...ev.groups, ...ev.pickups].forEach(g=>{ g.items = list(g.items); });
   return ev;
 }
@@ -358,6 +378,7 @@ let state = { currentId: null, events: {} };
 let editMode = false;
 let phase = "load"; // "load" = załadunek (checked), "unload" = rozładunek (checkedReturn)
 let equipmentFilter = "all"; // "all" | "unchecked" | "unclear"
+let personFilter = "all";
 
 function attachLiveSync(ev){
   if(liveRefs[ev.id]) return;
@@ -422,14 +443,20 @@ function loadState(){
     }
   }catch(e){}
   const ev = blankEvent("Ściąga logistyczna");
-  ev.groups = [{id:uid(), name:"Osoba 1", items:[{id:uid(), co:"Przykładowy przedmiot", gdzie:"lokalizacja", ilosc:1, notatka:"", checked:false, checkedReturn:false}]}];
+  ev.groups = [{id:uid(), name:"Magazyn 1", items:[{id:uid(), co:"Przykładowy przedmiot", gdzie:"osoba odpowiedzialna", ilosc:1, notatka:"", checked:false, checkedReturn:false}]}];
   ev.infoCards = [{id:uid(), title:"Adres i dojazd", address:"", body:""}];
   state = { currentId: ev.id, events: { [ev.id]: ev } };
 }
 function saveState(what){
   if(isReadOnly) return;
   const ev = currentEvent();
-  if(ev){ ev.lastEdit = { by: getUserName(), at: Date.now(), what: what || "zaktualizowano dane" }; }
+  if(ev){
+    const entry = { by: getUserName(), at: Date.now(), what: what || "zaktualizowano dane" };
+    ev.lastEdit = entry;
+    ev.history = Array.isArray(ev.history) ? ev.history : [];
+    ev.history.unshift(entry);
+    if(ev.history.length > 50) ev.history.length = 50;
+  }
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
   pushCloudDebounced();
   updateLastEditLine();
@@ -530,6 +557,7 @@ function render(){
     b.classList.toggle("active", b.getAttribute("data-phase")===phase);
   });
 
+  populatePersonFilter();
   renderGroups();
   equipmentEmpty();
   renderPickups();
@@ -538,9 +566,22 @@ function render(){
 }
 
 function matchesEquipmentFilter(item, field){
+  if(personFilter!=="all" && (item.gdzie||"").trim()!==personFilter) return false;
   if(equipmentFilter==="unchecked") return !item[field];
   if(equipmentFilter==="unclear") return (item.gdzie||"").indexOf("?")!==-1;
   return true;
+}
+
+function populatePersonFilter(){
+  const sel = document.getElementById("personFilter");
+  const ev = currentEvent();
+  const people = new Set();
+  ev.groups.forEach(g=>g.items.forEach(it=>{ const p=(it.gdzie||"").trim(); if(p) people.add(p); }));
+  const sorted = Array.from(people).sort((a,b)=>a.localeCompare(b,"pl"));
+  if(!sorted.includes(personFilter)) personFilter = "all";
+  sel.innerHTML = '<option value="all">Wszystkie osoby</option>' +
+    sorted.map(p=>'<option value="'+escapeHtml(p)+'"'+(p===personFilter?" selected":"")+'>'+escapeHtml(p)+'</option>').join("");
+  sel.style.display = sorted.length ? "block" : "none";
 }
 
 function equipmentEmpty(){
@@ -580,8 +621,8 @@ function renderGroups(){
 
     const right = document.createElement("span");
     if(editMode){
-      const rm = document.createElement("button"); rm.type="button"; rm.className = "remove-group"; rm.textContent = "Usuń grupę";
-      rm.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); ev.groups = ev.groups.filter(g=>g.id!==grp.id); saveState("usunięto grupę: "+grp.name); render(); });
+      const rm = document.createElement("button"); rm.type="button"; rm.className = "remove-group"; rm.textContent = "Usuń magazyn";
+      rm.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); ev.groups = ev.groups.filter(g=>g.id!==grp.id); saveState("usunięto magazyn: "+grp.name); render(); });
       right.appendChild(rm);
     } else {
       const chev = document.createElement("span"); chev.className = "chev"; chev.textContent = "›"; right.appendChild(chev);
@@ -603,7 +644,7 @@ function renderGroups(){
         coInp.addEventListener("input", ()=>{ item.co = coInp.value; saveState(); });
 
         const line2 = document.createElement("div"); line2.style.display="flex"; line2.style.gap="6px";
-        const gdzieInp = document.createElement("input"); gdzieInp.className = "field"; gdzieInp.value = item.gdzie; gdzieInp.placeholder = "Gdzie / kto";
+        const gdzieInp = document.createElement("input"); gdzieInp.className = "field"; gdzieInp.value = item.gdzie; gdzieInp.placeholder = "Osoba";
         gdzieInp.addEventListener("input", ()=>{ item.gdzie = gdzieInp.value; saveState(); });
         const iloscInp = document.createElement("input"); iloscInp.className = "field qty-input"; iloscInp.type="number"; iloscInp.min="1";
         iloscInp.value = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc; iloscInp.placeholder = "Ilość";
@@ -636,7 +677,7 @@ function renderGroups(){
       det.appendChild(addLabel);
       const addRow = document.createElement("div"); addRow.className = "add-row"; addRow.style.padding = "0 .9rem .4rem";
       const coI = document.createElement("input"); coI.className="field"; coI.placeholder="Co (wymagane)";
-      const gdzieI = document.createElement("input"); gdzieI.className="field"; gdzieI.placeholder="Gdzie / kto";
+      const gdzieI = document.createElement("input"); gdzieI.className="field"; gdzieI.placeholder="Osoba";
       const iloscI = document.createElement("input"); iloscI.className="field qty-input"; iloscI.type="number"; iloscI.min="1"; iloscI.placeholder="Ilość"; iloscI.value="1";
       const addBtn = document.createElement("button"); addBtn.type="button"; addBtn.className="btn primary"; addBtn.textContent="Dodaj";
       addRow.appendChild(coI); addRow.appendChild(gdzieI); addRow.appendChild(iloscI); addRow.appendChild(addBtn);
@@ -777,6 +818,11 @@ document.querySelectorAll(".filter-chip").forEach(b=>{
     equipmentEmpty();
   });
 });
+document.getElementById("personFilter").addEventListener("change", (e)=>{
+  personFilter = e.target.value;
+  renderGroups();
+  equipmentEmpty();
+});
 
 document.getElementById("eventSelect").addEventListener("change", (e)=>{
   state.currentId = e.target.value; saveLocalOnly(); render(); updateAddressBar();
@@ -821,7 +867,7 @@ document.getElementById("deleteEventBtn").addEventListener("click", ()=>{
   ensureCloud(currentEvent());
 });
 
-document.getElementById("addGroupBtn").addEventListener("click", ()=>{ currentEvent().groups.push({id:uid(), name:"Nowa grupa", items:[]}); saveState("dodano grupę"); render(); });
+document.getElementById("addGroupBtn").addEventListener("click", ()=>{ currentEvent().groups.push({id:uid(), name:"Nowy magazyn", items:[]}); saveState("dodano magazyn"); render(); });
 document.getElementById("addPickupBtn").addEventListener("click", ()=>{ currentEvent().pickups.push({id:uid(), name:"Nowa lista odbioru", items:[]}); saveState("dodano listę odbioru"); render(); });
 document.getElementById("addInfoBtn").addEventListener("click", ()=>{ currentEvent().infoCards.push({id:uid(), title:"Nowa karta", address:"", body:""}); saveState("dodano kartę informacyjną"); render(); });
 
@@ -840,7 +886,7 @@ document.getElementById("exportBtn").addEventListener("click", ()=>{
   wsSettings["!cols"] = [{wch:14},{wch:40}];
   XLSX.utils.book_append_sheet(wb, wsSettings, "Ustawienia");
 
-  const sprzetRows = [["Grupa","Co","Gdzie / kto","Ilość","Notatka","Zaladunek","Rozladunek"]];
+  const sprzetRows = [["Magazyn","Co","Osoba","Ilość","Notatka","Zaladunek","Rozladunek"]];
   ev.groups.forEach(g=>{
     g.items.forEach(it=>{ sprzetRows.push([g.name, it.co, it.gdzie||"", (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.notatka||"", it.checked?"tak":"nie", it.checkedReturn?"tak":"nie"]); });
     if(g.items.length===0) sprzetRows.push([g.name,"","","","","",""]);
@@ -924,14 +970,19 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
 // ---------------- eksport dla magazynu (płaska lista) ----------------
 document.getElementById("warehouseBtn").addEventListener("click", ()=>{
   const ev = currentEvent();
-  const rows = [["Co","Ilość","Gdzie","Notatka"]];
-  ev.groups.forEach(g=>{
-    g.items.forEach(it=>{ rows.push([it.co, (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.gdzie||"", it.notatka||""]); });
-  });
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = [{wch:38},{wch:8},{wch:20},{wch:30}];
-  XLSX.utils.book_append_sheet(wb, ws, "Lista dla magazynu");
+  ev.groups.forEach(g=>{
+    const rows = [["Co","Ilość","Osoba","Notatka"]];
+    g.items.forEach(it=>{ rows.push([it.co, (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.gdzie||"", it.notatka||""]); });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{wch:38},{wch:8},{wch:20},{wch:30}];
+    const safeName = (g.name||"Magazyn").replace(/[\\\/\?\*\[\]:]/g,"_").slice(0,31) || "Magazyn";
+    XLSX.utils.book_append_sheet(wb, ws, safeName);
+  });
+  if(ev.groups.length===0){
+    const ws = XLSX.utils.aoa_to_sheet([["Co","Ilość","Osoba","Notatka"]]);
+    XLSX.utils.book_append_sheet(wb, ws, "Lista dla magazynu");
+  }
   XLSX.writeFile(wb, (ev.title||"event").replace(/[^a-z0-9\-_ąćęłńóśźż]/gi,"_")+"_magazyn.xlsx");
 });
 
@@ -983,6 +1034,10 @@ document.getElementById("shareBtn").addEventListener("click", openShare);
 document.getElementById("closeShareBtn").addEventListener("click", closeShare);
 shareModal.addEventListener("click", (e)=>{ if(e.target===shareModal) closeShare(); });
 document.addEventListener("keydown", (e)=>{
+  if(e.key==="Escape"){
+    if(paletteModal.classList.contains("show")) paletteModal.classList.remove("show");
+    if(historyModal.classList.contains("show")) historyModal.classList.remove("show");
+  }
   if(!shareModal.classList.contains("show")) return;
   if(e.key==="Escape"){ closeShare(); return; }
   if(e.key==="Tab"){
@@ -1089,6 +1144,28 @@ document.getElementById("paletteToggle").addEventListener("click", ()=>{
 });
 document.getElementById("closePaletteBtn").addEventListener("click", ()=>paletteModal.classList.remove("show"));
 paletteModal.addEventListener("click", (e)=>{ if(e.target===paletteModal) paletteModal.classList.remove("show"); });
+
+// ---------------- historia zmian ----------------
+const historyModal = document.getElementById("historyModal");
+function renderHistory(){
+  const ev = currentEvent();
+  const body = document.getElementById("historyBody");
+  const hist = (ev && Array.isArray(ev.history)) ? ev.history : [];
+  if(!hist.length){ body.innerHTML = '<p class="history-empty">Brak zapisanej historii dla tego eventu.</p>'; return; }
+  body.innerHTML = hist.map(h=>{
+    const d = new Date(h.at);
+    const dd = String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0");
+    const hh = String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+    return '<div class="history-item"><span class="hwhat">'+escapeHtml(h.what||"")+'</span>'+
+      '<span class="hmeta">'+escapeHtml(h.by||"")+" · "+dd+" "+hh+'</span></div>';
+  }).join("");
+}
+document.getElementById("historyBtn").addEventListener("click", ()=>{
+  renderHistory();
+  historyModal.classList.add("show");
+});
+document.getElementById("closeHistoryBtn").addEventListener("click", ()=>historyModal.classList.remove("show"));
+historyModal.addEventListener("click", (e)=>{ if(e.target===historyModal) historyModal.classList.remove("show"); });
 
 // ---------------- init ----------------
 document.addEventListener("focusout", ()=>{
