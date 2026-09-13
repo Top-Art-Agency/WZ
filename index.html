@@ -130,7 +130,11 @@
 
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto;}
   .modal-overlay.show{display:flex;}
-  .modal{background:#fff;border-radius:14px;padding:1.2rem;max-width:360px;width:100%;}
+  .modal{
+    --bg:#fff; --paper:#fff; --ink:#152b3b; --muted:#647786; --line:#dbe4eb; --soft:#f6f9fb;
+    --green:#176861; --green-deep:#104e48; --lime:#c4e987; --amber:#e9a445; --amber-deep:#81521c; --red:#b94746;
+    background:#fff;color:#152b3b;border-radius:14px;padding:1.2rem;max-width:360px;width:100%;
+  }
   .modal h3{margin:0 0 .6rem;font-size:16px;}
   .modal p{font-size:13.5px;color:var(--muted);margin:0 0 .8rem;}
   .modal .qr-box{display:flex;justify-content:center;padding:.8rem 0;}
@@ -450,16 +454,16 @@ function loadState(){
 function saveState(what){
   if(isReadOnly) return;
   const ev = currentEvent();
-  if(ev){
-    const entry = { by: getUserName(), at: Date.now(), what: what || "zaktualizowano dane" };
+  if(ev && what){
+    const entry = { by: getUserName(), at: Date.now(), what };
     ev.lastEdit = entry;
     ev.history = Array.isArray(ev.history) ? ev.history : [];
     ev.history.unshift(entry);
     if(ev.history.length > 50) ev.history.length = 50;
+    updateLastEditLine();
   }
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
   pushCloudDebounced();
-  updateLastEditLine();
 }
 const USERNAME_KEY = "logistics-tool-username";
 function getUserName(){
@@ -612,6 +616,7 @@ function renderGroups(){
       inp.className = "group-edit-name field"; inp.value = grp.name; inp.style.marginRight = "6px";
       inp.addEventListener("click", e=>e.stopPropagation());
       inp.addEventListener("input", ()=>{ grp.name = inp.value; saveState(); });
+      inp.addEventListener("blur", ()=>{ saveState("zmieniono nazwę magazynu: "+grp.name); });
       left.appendChild(inp);
     } else { left.textContent = grp.name; }
     const count = document.createElement("span"); count.className = "group-count";
@@ -642,10 +647,12 @@ function renderGroups(){
         const txt = document.createElement("div"); txt.className = "txt";
         const coInp = document.createElement("input"); coInp.className = "field"; coInp.value = item.co; coInp.placeholder = "Co";
         coInp.addEventListener("input", ()=>{ item.co = coInp.value; saveState(); });
+        coInp.addEventListener("blur", ()=>{ saveState("zmieniono nazwę pozycji: "+item.co); });
 
         const line2 = document.createElement("div"); line2.style.display="flex"; line2.style.gap="6px";
         const gdzieInp = document.createElement("input"); gdzieInp.className = "field"; gdzieInp.value = item.gdzie; gdzieInp.placeholder = "Osoba";
         gdzieInp.addEventListener("input", ()=>{ item.gdzie = gdzieInp.value; saveState(); });
+        gdzieInp.addEventListener("blur", ()=>{ saveState("zmieniono osobę przy: "+item.co+(item.gdzie?" → "+item.gdzie:"")); });
         const iloscInp = document.createElement("input"); iloscInp.className = "field qty-input"; iloscInp.type="number"; iloscInp.min="1";
         iloscInp.value = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc; iloscInp.placeholder = "Ilość";
         iloscInp.addEventListener("input", ()=>{ item.ilosc = iloscInp.value; saveState(); });
@@ -653,7 +660,7 @@ function renderGroups(){
 
         const noteInp = document.createElement("input"); noteInp.className = "field"; noteInp.value = item.notatka||""; noteInp.placeholder = "Notatka (opcjonalnie)";
         noteInp.addEventListener("input", ()=>{ item.notatka = noteInp.value; saveState(); });
-
+        noteInp.addEventListener("blur", ()=>{ saveState("zmieniono notatkę przy: "+item.co); });
         txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(noteInp);
         row.appendChild(txt); row.appendChild(del);
       } else {
@@ -709,6 +716,7 @@ function renderPickups(){
       const inp = document.createElement("input"); inp.className = "group-edit-name field"; inp.value = grp.name; inp.style.marginRight="6px";
       inp.addEventListener("click", e=>e.stopPropagation());
       inp.addEventListener("input", ()=>{ grp.name = inp.value; saveState(); });
+      inp.addEventListener("blur", ()=>{ saveState("zmieniono nazwę listy odbioru: "+grp.name); });
       left.appendChild(inp);
     } else { left.textContent = grp.name; }
     const count = document.createElement("span"); count.className="group-count"; count.textContent = grp.items.length;
@@ -729,12 +737,14 @@ function renderPickups(){
         const txt = document.createElement("div"); txt.className="txt";
         const textInp = document.createElement("input"); textInp.className="field"; textInp.value = item.text; textInp.placeholder="Pozycja";
         textInp.addEventListener("input", ()=>{ item.text = textInp.value; saveState(); });
+        textInp.addEventListener("blur", ()=>{ saveState("zmieniono treść pozycji: "+item.text); });
         const line2 = document.createElement("div"); line2.style.display="flex"; line2.style.gap="6px";
         const iloscInp = document.createElement("input"); iloscInp.className = "field qty-input"; iloscInp.type="number"; iloscInp.min="1";
         iloscInp.value = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc; iloscInp.placeholder = "Ilość";
         iloscInp.addEventListener("input", ()=>{ item.ilosc = iloscInp.value; saveState(); });
         const noteInp = document.createElement("input"); noteInp.className="field"; noteInp.value = item.notatka||""; noteInp.placeholder="Notatka (opcjonalnie)";
         noteInp.addEventListener("input", ()=>{ item.notatka = noteInp.value; saveState(); });
+        noteInp.addEventListener("blur", ()=>{ saveState("zmieniono notatkę przy: "+item.text); });
         line2.appendChild(iloscInp);
         txt.appendChild(textInp); txt.appendChild(line2); txt.appendChild(noteInp);
         row.appendChild(txt); row.appendChild(del);
@@ -807,7 +817,9 @@ function renderInfoCards(){
 // ---------------- event handlers: header controls ----------------
 document.getElementById("editToggle").addEventListener("click", ()=>{ editMode = !editMode; render(); });
 document.getElementById("titleInput").addEventListener("input", e=>{ currentEvent().title = e.target.value; saveState(); document.getElementById("titleText").textContent = e.target.value; populateEventSelect(); });
+document.getElementById("titleInput").addEventListener("blur", ()=>{ saveState("zmieniono nazwę eventu: "+currentEvent().title); });
 document.getElementById("subInput").addEventListener("input", e=>{ currentEvent().subtitle = e.target.value; saveState(); document.getElementById("subText").textContent = e.target.value; });
+document.getElementById("subInput").addEventListener("blur", ()=>{ saveState("zmieniono podtytuł eventu"); });
 
 document.querySelectorAll(".phase-btn").forEach(b=>{
   b.addEventListener("click", ()=>{ phase = b.getAttribute("data-phase"); render(); });
