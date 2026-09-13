@@ -679,15 +679,16 @@ function renderGroups(){
       const coI = document.createElement("input"); coI.className="field"; coI.placeholder="Co (wymagane)";
       const gdzieI = document.createElement("input"); gdzieI.className="field"; gdzieI.placeholder="Osoba";
       const iloscI = document.createElement("input"); iloscI.className="field qty-input"; iloscI.type="number"; iloscI.min="1"; iloscI.placeholder="Ilość"; iloscI.value="1";
+      const notatkaI = document.createElement("input"); notatkaI.className="field"; notatkaI.placeholder="Notatka (opcjonalnie)"; notatkaI.style.flexBasis="100%";
       const addBtn = document.createElement("button"); addBtn.type="button"; addBtn.className="btn primary"; addBtn.textContent="Dodaj";
-      addRow.appendChild(coI); addRow.appendChild(gdzieI); addRow.appendChild(iloscI); addRow.appendChild(addBtn);
+      addRow.appendChild(coI); addRow.appendChild(gdzieI); addRow.appendChild(iloscI); addRow.appendChild(notatkaI); addRow.appendChild(addBtn);
       det.appendChild(addRow);
       const errMsg = document.createElement("p"); errMsg.className = "add-error-msg"; errMsg.textContent = "Wpisz nazwę przedmiotu w polu \"Co\", zanim dodasz.";
       det.appendChild(errMsg);
       addBtn.addEventListener("click", ()=>{
         if(!Number.isSafeInteger(Number(iloscI.value)) || Number(iloscI.value)<1){ showNotice("Ilość musi być dodatnią liczbą całkowitą."); iloscI.focus(); return; }
         if(!coI.value.trim()){ coI.classList.add("error"); errMsg.classList.add("show"); coI.focus(); return; }
-        grp.items.push({id:uid(), co:coI.value.trim(), gdzie:gdzieI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:"", checked:false, checkedReturn:false});
+        grp.items.push({id:uid(), co:coI.value.trim(), gdzie:gdzieI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:notatkaI.value.trim(), checked:false, checkedReturn:false});
         saveState("dodano: "+coI.value.trim()); render();
       });
       coI.addEventListener("input", ()=>{ coI.classList.remove("error"); errMsg.classList.remove("show"); });
@@ -758,15 +759,16 @@ function renderPickups(){
       const addRow = document.createElement("div"); addRow.className="add-row"; addRow.style.padding="0 .9rem .4rem";
       const textI = document.createElement("input"); textI.className="field"; textI.placeholder="Treść pozycji (wymagane)";
       const iloscI = document.createElement("input"); iloscI.className="field qty-input"; iloscI.type="number"; iloscI.min="1"; iloscI.placeholder="Ilość"; iloscI.value="1";
+      const notatkaI = document.createElement("input"); notatkaI.className="field"; notatkaI.placeholder="Notatka (opcjonalnie)"; notatkaI.style.flexBasis="100%";
       const addBtn = document.createElement("button"); addBtn.type="button"; addBtn.className="btn primary"; addBtn.textContent="Dodaj";
-      addRow.appendChild(textI); addRow.appendChild(iloscI); addRow.appendChild(addBtn);
+      addRow.appendChild(textI); addRow.appendChild(iloscI); addRow.appendChild(notatkaI); addRow.appendChild(addBtn);
       det.appendChild(addRow);
       const errMsg = document.createElement("p"); errMsg.className = "add-error-msg"; errMsg.textContent = "Wpisz treść pozycji, zanim dodasz.";
       det.appendChild(errMsg);
       addBtn.addEventListener("click", ()=>{
         if(!Number.isSafeInteger(Number(iloscI.value)) || Number(iloscI.value)<1){ showNotice("Ilość musi być dodatnią liczbą całkowitą."); iloscI.focus(); return; }
         if(!textI.value.trim()){ textI.classList.add("error"); errMsg.classList.add("show"); textI.focus(); return; }
-        grp.items.push({id:uid(), text:textI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:"", checked:false});
+        grp.items.push({id:uid(), text:textI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:notatkaI.value.trim(), checked:false});
         saveState("dodano: "+textI.value.trim()); render();
       });
       textI.addEventListener("input", ()=>{ textI.classList.remove("error"); errMsg.classList.remove("show"); });
