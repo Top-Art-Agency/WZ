@@ -28,7 +28,7 @@
   .wrap{max-width:480px;margin:0 auto;padding:0 1rem;}
   a{color:var(--green-deep);}
 
-  .sticky-top{position:sticky;top:0;z-index:15;}
+  .sticky-top{position:relative;}
   header.top{background:var(--green);color:#fff;padding:1.1rem 12.3rem 1rem 1rem;border-bottom:3px solid var(--green-deep);}
   header.top .eyebrow{font-size:12.5px;color:#CFEAD9;margin:0 0 6px;}
   header.top h1{font-size:20px;font-weight:700;margin:0;border:none;background:none;color:#fff;padding:0;display:inline;}
@@ -58,7 +58,7 @@
   .progress-fill{height:100%;background:var(--lime);width:0%;transition:width .25s ease;}
   .progress-label{font-size:13px;font-weight:600;white-space:nowrap;min-width:52px;text-align:right;}
 
-  nav.chips{display:flex;gap:8px;overflow-x:auto;padding:.7rem 1rem;background:var(--paper);border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch;}
+  nav.chips{position:sticky;top:0;z-index:15;display:flex;gap:8px;overflow-x:auto;padding:.7rem 1rem;background:var(--paper);border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch;}
   nav.chips::-webkit-scrollbar{display:none;}
   nav.chips a{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--green-deep);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:6px 12px;text-decoration:none;white-space:nowrap;}
   nav.chips button.chip-btn{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--green-deep);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;white-space:nowrap;}
@@ -178,7 +178,7 @@
     .progress-row{grid-column:2;grid-row:3;max-width:280px;justify-self:end;}
     .last-edit{grid-column:1 / -1;}
 
-    nav.chips{padding:1rem 0;background:transparent;border-bottom:none;}
+    nav.chips{position:static;padding:1rem 0;background:transparent;border-bottom:none;}
 
     .content-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,1fr);gap:28px;align-items:start;}
     .secondary-column{display:grid;gap:28px;}
@@ -426,10 +426,10 @@ function loadState(){
   ev.infoCards = [{id:uid(), title:"Adres i dojazd", address:"", body:""}];
   state = { currentId: ev.id, events: { [ev.id]: ev } };
 }
-function saveState(){
+function saveState(what){
   if(isReadOnly) return;
   const ev = currentEvent();
-  if(ev){ ev.lastEdit = { by: getUserName(), at: Date.now() }; }
+  if(ev){ ev.lastEdit = { by: getUserName(), at: Date.now(), what: what || "zaktualizowano dane" }; }
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
   pushCloudDebounced();
   updateLastEditLine();
@@ -451,7 +451,8 @@ function updateLastEditLine(){
   const d = new Date(ev.lastEdit.at);
   const hh = String(d.getHours()).padStart(2,"0");
   const mm = String(d.getMinutes()).padStart(2,"0");
-  line.textContent = "Ostatnia zmiana: " + ev.lastEdit.by + ", " + hh + ":" + mm;
+  const what = ev.lastEdit.what ? " — " + ev.lastEdit.what : "";
+  line.textContent = "Ostatnia zmiana: " + ev.lastEdit.by + ", " + hh + ":" + mm + what;
   line.style.display = "block";
 }
 function currentEvent(){ return state.events[state.currentId]; }
@@ -580,7 +581,7 @@ function renderGroups(){
     const right = document.createElement("span");
     if(editMode){
       const rm = document.createElement("button"); rm.type="button"; rm.className = "remove-group"; rm.textContent = "Usuń grupę";
-      rm.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); ev.groups = ev.groups.filter(g=>g.id!==grp.id); saveState(); render(); });
+      rm.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); ev.groups = ev.groups.filter(g=>g.id!==grp.id); saveState("usunięto grupę: "+grp.name); render(); });
       right.appendChild(rm);
     } else {
       const chev = document.createElement("span"); chev.className = "chev"; chev.textContent = "›"; right.appendChild(chev);
@@ -595,7 +596,7 @@ function renderGroups(){
 
       if(editMode){
         const del = document.createElement("button"); del.type="button"; del.className = "del"; del.textContent = "✕"; del.style.display = "inline-block";
-        del.addEventListener("click", ()=>{ grp.items = grp.items.filter(it=>it.id!==item.id); saveState(); render(); });
+        del.addEventListener("click", ()=>{ grp.items = grp.items.filter(it=>it.id!==item.id); saveState("usunięto: "+item.co); render(); });
 
         const txt = document.createElement("div"); txt.className = "txt";
         const coInp = document.createElement("input"); coInp.className = "field"; coInp.value = item.co; coInp.placeholder = "Co";
@@ -618,7 +619,7 @@ function renderGroups(){
         const box = document.createElement("input"); box.type = "checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
         box.checked = !!item[field];
         box.setAttribute("aria-label", (phase==="load" ? "Załadowano: " : "Rozładowano: ") + item.co);
-        box.addEventListener("change", ()=>{ item[field] = box.checked; row.classList.toggle("checked", box.checked); saveState(); updateProgress(); });
+        box.addEventListener("change", ()=>{ item[field] = box.checked; row.classList.toggle("checked", box.checked); saveState((box.checked?(phase==="load"?"załadowano: ":"rozładowano: "):(phase==="load"?"cofnięto załadunek: ":"cofnięto rozładunek: "))+item.co); updateProgress(); });
         const txt = document.createElement("div"); txt.className = "txt";
         const qty = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc;
         let html = '<span class="co">'+escapeHtml(item.co)+(Number(qty)!==1 ? '<span class="qty-badge">×'+escapeHtml(String(qty))+'</span>' : '')+'</span>';
@@ -646,7 +647,7 @@ function renderGroups(){
         if(!Number.isSafeInteger(Number(iloscI.value)) || Number(iloscI.value)<1){ showNotice("Ilość musi być dodatnią liczbą całkowitą."); iloscI.focus(); return; }
         if(!coI.value.trim()){ coI.classList.add("error"); errMsg.classList.add("show"); coI.focus(); return; }
         grp.items.push({id:uid(), co:coI.value.trim(), gdzie:gdzieI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:"", checked:false, checkedReturn:false});
-        saveState(); render();
+        saveState("dodano: "+coI.value.trim()); render();
       });
       coI.addEventListener("input", ()=>{ coI.classList.remove("error"); errMsg.classList.remove("show"); });
     }
@@ -673,7 +674,7 @@ function renderPickups(){
     const right = document.createElement("span");
     if(editMode){
       const rm = document.createElement("button"); rm.type="button"; rm.className="remove-group"; rm.textContent="Usuń listę";
-      rm.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); ev.pickups = ev.pickups.filter(g=>g.id!==grp.id); saveState(); render(); });
+      rm.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); ev.pickups = ev.pickups.filter(g=>g.id!==grp.id); saveState("usunięto listę odbioru: "+grp.name); render(); });
       right.appendChild(rm);
     } else { const chev=document.createElement("span"); chev.className="chev"; chev.textContent="›"; right.appendChild(chev); }
     summary.appendChild(right); det.appendChild(summary);
@@ -682,7 +683,7 @@ function renderPickups(){
       const row = document.createElement("div"); row.className = "item-row" + (item.checked ? " checked" : "");
       if(editMode){
         const del = document.createElement("button"); del.type="button"; del.className="del"; del.textContent="✕"; del.style.display="inline-block";
-        del.addEventListener("click", ()=>{ grp.items = grp.items.filter(it=>it.id!==item.id); saveState(); render(); });
+        del.addEventListener("click", ()=>{ grp.items = grp.items.filter(it=>it.id!==item.id); saveState("usunięto: "+item.text); render(); });
         const txt = document.createElement("div"); txt.className="txt";
         const textInp = document.createElement("input"); textInp.className="field"; textInp.value = item.text; textInp.placeholder="Pozycja";
         textInp.addEventListener("input", ()=>{ item.text = textInp.value; saveState(); });
@@ -699,7 +700,7 @@ function renderPickups(){
         const box = document.createElement("input"); box.type="checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
         box.checked = !!item.checked;
         box.setAttribute("aria-label", "Odebrano: " + item.text);
-        box.addEventListener("change", ()=>{ item.checked = box.checked; row.classList.toggle("checked", box.checked); saveState(); updateProgress(); });
+        box.addEventListener("change", ()=>{ item.checked = box.checked; row.classList.toggle("checked", box.checked); saveState((box.checked?"odebrano: ":"cofnięto odbiór: ")+item.text); updateProgress(); });
         const txt = document.createElement("div"); txt.className="txt";
         const qty = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc;
         let html = '<span class="co">'+escapeHtml(item.text)+(Number(qty)!==1 ? '<span class="qty-badge">×'+escapeHtml(String(qty))+'</span>' : '')+'</span>';
@@ -725,7 +726,7 @@ function renderPickups(){
         if(!Number.isSafeInteger(Number(iloscI.value)) || Number(iloscI.value)<1){ showNotice("Ilość musi być dodatnią liczbą całkowitą."); iloscI.focus(); return; }
         if(!textI.value.trim()){ textI.classList.add("error"); errMsg.classList.add("show"); textI.focus(); return; }
         grp.items.push({id:uid(), text:textI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:"", checked:false});
-        saveState(); render();
+        saveState("dodano: "+textI.value.trim()); render();
       });
       textI.addEventListener("input", ()=>{ textI.classList.remove("error"); errMsg.classList.remove("show"); });
     }
@@ -741,7 +742,7 @@ function renderInfoCards(){
     const div = document.createElement("div"); div.className = "info-card";
     if(editMode){
       const rm = document.createElement("button"); rm.type="button"; rm.className="remove-card"; rm.textContent="✕";
-      rm.addEventListener("click", ()=>{ ev.infoCards = ev.infoCards.filter(c=>c.id!==card.id); saveState(); render(); });
+      rm.addEventListener("click", ()=>{ ev.infoCards = ev.infoCards.filter(c=>c.id!==card.id); saveState("usunięto kartę: "+card.title); render(); });
       div.appendChild(rm);
       const titleI = document.createElement("input"); titleI.className="field"; titleI.value=card.title; titleI.placeholder="Tytuł karty";
       titleI.addEventListener("input", ()=>{ card.title = titleI.value; saveState(); });
@@ -820,9 +821,9 @@ document.getElementById("deleteEventBtn").addEventListener("click", ()=>{
   ensureCloud(currentEvent());
 });
 
-document.getElementById("addGroupBtn").addEventListener("click", ()=>{ currentEvent().groups.push({id:uid(), name:"Nowa grupa", items:[]}); saveState(); render(); });
-document.getElementById("addPickupBtn").addEventListener("click", ()=>{ currentEvent().pickups.push({id:uid(), name:"Nowa lista odbioru", items:[]}); saveState(); render(); });
-document.getElementById("addInfoBtn").addEventListener("click", ()=>{ currentEvent().infoCards.push({id:uid(), title:"Nowa karta", address:"", body:""}); saveState(); render(); });
+document.getElementById("addGroupBtn").addEventListener("click", ()=>{ currentEvent().groups.push({id:uid(), name:"Nowa grupa", items:[]}); saveState("dodano grupę"); render(); });
+document.getElementById("addPickupBtn").addEventListener("click", ()=>{ currentEvent().pickups.push({id:uid(), name:"Nowa lista odbioru", items:[]}); saveState("dodano listę odbioru"); render(); });
+document.getElementById("addInfoBtn").addEventListener("click", ()=>{ currentEvent().infoCards.push({id:uid(), title:"Nowa karta", address:"", body:""}); saveState("dodano kartę informacyjną"); render(); });
 
 document.getElementById("resetBtn").addEventListener("click", ()=>{
   if(!confirm("Wyczyścić dane TEGO eventu i zacząć od zera?")) return;
