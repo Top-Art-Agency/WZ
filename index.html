@@ -9,17 +9,30 @@
     --bg:#F7F5EE; --paper:#FFFFFF; --ink:#201F1B; --muted:#6E6C63; --line:#E4E1D6;
     --green:#0E6B44; --green-deep:#0A4E32; --lime:#D8E76B; --amber:#F2A93B; --amber-deep:#6B4708; --red:#C1462F;
   }
+  body.dark{
+    --bg:#14181B; --paper:#1E2327; --ink:#ECEAE2; --muted:#9B988D; --line:#323A3E;
+    --amber-deep:#F2C77A; --red:#E0665A;
+  }
+  body.dark .btn{ background:var(--paper); color:var(--ink); border-color:var(--line); }
+  body.dark input.field, body.dark textarea.field, body.dark select.field{ background:var(--paper); color:var(--ink); border-color:var(--line); }
+  body.dark .qty-badge, body.dark .group-count{ background:#1F3A2C; color:#8FD9AE; }
+  body.dark nav.chips a, body.dark .chip-btn{ background:#1F2A22; border-color:#2C3A30; color:#8FD9AE; }
+  body.dark .info-card, body.dark details.group{ box-shadow:none; }
+  body.dark .rule-card{ background:#332A12; border-color:#5A4A1E; }
+  body.dark .rule-card strong{ color:var(--amber-deep); }
+  body.dark .theme-toggle{ background:rgba(255,255,255,.16); }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.45;padding-bottom:3rem;}
   .wrap{max-width:480px;margin:0 auto;padding:0 1rem;}
   a{color:var(--green-deep);}
 
-  header.top{position:sticky;top:0;z-index:10;background:var(--green);color:#fff;padding:1.1rem 6rem 1rem 1rem;border-bottom:3px solid var(--green-deep);}
+  header.top{position:sticky;top:0;z-index:10;background:var(--green);color:#fff;padding:1.1rem 7.6rem 1rem 1rem;border-bottom:3px solid var(--green-deep);}
   header.top .eyebrow{font-size:12.5px;color:#CFEAD9;margin:0 0 6px;}
   header.top h1{font-size:20px;font-weight:700;margin:0;border:none;background:none;color:#fff;padding:0;display:inline;}
   header.top .sub{font-size:13px;color:#DCEFE3;margin:2px 0 8px;}
   .cloud-badge{font-size:11px;font-weight:700;background:rgba(255,255,255,.2);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle;}
+  .last-edit{font-size:11.5px;color:#DCEFE3;margin:.4rem 0 0;}
 
   .event-row{display:flex;gap:6px;align-items:center;margin-bottom:.5rem;}
   .event-row select.field{flex:1;margin:0;}
@@ -29,6 +42,8 @@
   .fab{position:absolute;top:1rem;right:1rem;z-index:20;background:rgba(255,255,255,.16);color:#fff;
     border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;}
   body.edit-mode .fab{background:var(--lime);color:var(--green-deep);border-color:var(--lime);}
+  .theme-toggle{position:absolute;top:1rem;right:5.6rem;z-index:20;background:rgba(255,255,255,.16);color:#fff;
+    border:1px solid rgba(255,255,255,.4);border-radius:999px;width:34px;height:34px;font-size:15px;cursor:pointer;}
 
   .phase-toggle{display:flex;background:rgba(255,255,255,.14);border-radius:999px;padding:3px;margin:.4rem 0;}
   .phase-toggle button{flex:1;border:none;background:none;color:#DCEFE3;font-size:12.5px;font-weight:700;
@@ -49,6 +64,11 @@
   section:last-of-type{border-bottom:none;}
   h2.section-title{font-size:17px;font-weight:700;margin:0 0 .2rem;}
   p.section-sub{font-size:13px;color:var(--muted);margin:0 0 .9rem;}
+  .filter-row{display:flex;gap:6px;margin-bottom:.7rem;flex-wrap:wrap;}
+  .filter-chip{font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:999px;border:1px solid var(--line);
+    background:var(--paper);color:var(--muted);cursor:pointer;}
+  .filter-chip.active{background:var(--green);color:#fff;border-color:var(--green-deep);}
+  body.edit-mode .filter-row{display:none;}
 
   details.group{background:var(--paper);border:1px solid var(--line);border-radius:12px;margin-bottom:.6rem;overflow:hidden;}
   details.group[open]{border-color:#C9D8BC;}
@@ -63,6 +83,8 @@
   .item-row input[type=checkbox]{appearance:none;-webkit-appearance:none;width:20px;height:20px;flex:none;margin-top:1px;border:2px solid #B9B6A9;border-radius:6px;background:#fff;position:relative;cursor:pointer;}
   .item-row input[type=checkbox]:checked{background:var(--green);border-color:var(--green);}
   .item-row input[type=checkbox]:checked::after{content:"";position:absolute;left:5px;top:1px;width:6px;height:11px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
+  .item-row input[type=checkbox]:disabled{opacity:.6;cursor:default;}
+  .readonly-badge{font-size:11px;font-weight:700;background:rgba(255,255,255,.2);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle;}
   .item-row .txt{flex:1;}
   .item-row.checked .co{color:var(--muted);text-decoration:line-through;}
   .item-row .meta{display:block;font-size:12px;color:var(--muted);margin-top:1px;}
@@ -111,6 +133,7 @@
   .modal .link-box{font-size:12.5px;background:#F2F0E8;border-radius:8px;padding:8px 10px;word-break:break-all;margin-bottom:.7rem;}
   .modal .modal-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:.6rem;}
   .modal .status-msg{font-size:12.5px;margin-top:.5rem;}
+  .modal .mini-label-share{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:.2rem 0 .3rem;}
 </style>
 </head>
 <body>
@@ -118,15 +141,17 @@
 
   <header class="top">
     <button type="button" class="fab" id="editToggle">✎ Edytuj</button>
+    <button type="button" class="theme-toggle" id="themeToggle" title="Przełącz motyw">🌙</button>
     <p class="eyebrow">Narzędzie do ściąg logistycznych</p>
 
     <div class="event-row">
       <select class="field" id="eventSelect"></select>
       <button type="button" class="icon-btn edit-only-inline" id="newEventBtn" title="Nowy event">+</button>
+      <button type="button" class="icon-btn edit-only-inline" id="duplicateEventBtn" title="Duplikuj event">⧉</button>
       <button type="button" class="icon-btn edit-only-inline" id="deleteEventBtn" title="Usuń event">🗑</button>
     </div>
 
-    <div id="titleView"><h1 id="titleText">Ściąga logistyczna</h1><span class="cloud-badge" id="cloudBadge" style="display:none;">🔗 współdzielony</span></div>
+    <div id="titleView"><h1 id="titleText">Ściąga logistyczna</h1><span class="cloud-badge" id="cloudBadge" style="display:none;">🔗 współdzielony</span><span class="readonly-badge" id="readonlyBadge" style="display:none;">👁 tylko podgląd</span></div>
     <input class="field edit-only" id="titleInput" placeholder="Tytuł">
     <div id="subView"><p class="sub" id="subText"></p></div>
     <input class="field edit-only" id="subInput" placeholder="Podtytuł / nazwa eventu">
@@ -141,6 +166,7 @@
       <span class="progress-label" id="progressLabel">0 / 0</span>
       <span class="cloud-badge" id="liveBadge" style="display:none;">● na żywo</span>
     </div>
+    <p class="last-edit" id="lastEditLine" style="display:none;"></p>
   </header>
 
   <nav class="chips">
@@ -161,6 +187,11 @@
   <section id="sprzet">
     <h2 class="section-title">Sprzęt / rzeczy do zabrania</h2>
     <p class="section-sub">Grupuj wg osoby odpowiedzialnej. Przełącz fazę na górze, żeby odhaczać załadunek albo rozładunek.</p>
+    <div class="filter-row" id="equipmentFilterRow">
+      <button type="button" class="filter-chip active" data-filter="all">Wszystkie</button>
+      <button type="button" class="filter-chip" data-filter="unchecked">Nieodhaczone</button>
+      <button type="button" class="filter-chip" data-filter="unclear">Do ustalenia</button>
+    </div>
     <div id="equipmentGroups"></div>
     <div class="edit-only"><button class="btn" id="addGroupBtn">+ Dodaj grupę (osobę)</button></div>
   </section>
@@ -224,6 +255,7 @@ function blankEvent(title, forcedId){
 let state = { currentId: null, events: {} };
 let editMode = false;
 let phase = "load"; // "load" = załadunek (checked), "unload" = rozładunek (checkedReturn)
+let equipmentFilter = "all"; // "all" | "unchecked" | "unclear"
 
 function attachLiveSync(ev){
   if(liveRefs[ev.id]) return;
@@ -274,8 +306,31 @@ function loadState(){
   state = { currentId: ev.id, events: { [ev.id]: ev } };
 }
 function saveState(){
+  const ev = currentEvent();
+  if(ev){ ev.lastEdit = { by: getUserName(), at: Date.now() }; }
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
   pushCloudDebounced();
+  updateLastEditLine();
+}
+const USERNAME_KEY = "logistics-tool-username";
+function getUserName(){
+  let name = null;
+  try{ name = localStorage.getItem(USERNAME_KEY); }catch(e){}
+  if(!name){
+    name = (prompt("Jak masz na imię? (pokaże się przy Twoich zmianach)", "") || "").trim() || "Ktoś";
+    try{ localStorage.setItem(USERNAME_KEY, name); }catch(e){}
+  }
+  return name;
+}
+function updateLastEditLine(){
+  const ev = currentEvent();
+  const line = document.getElementById("lastEditLine");
+  if(!ev || !ev.lastEdit){ line.style.display = "none"; return; }
+  const d = new Date(ev.lastEdit.at);
+  const hh = String(d.getHours()).padStart(2,"0");
+  const mm = String(d.getMinutes()).padStart(2,"0");
+  line.textContent = "Ostatnia zmiana: " + ev.lastEdit.by + ", " + hh + ":" + mm;
+  line.style.display = "block";
 }
 function currentEvent(){ return state.events[state.currentId]; }
 
@@ -318,6 +373,8 @@ function populateEventSelect(){
 function render(){
   document.body.classList.toggle("edit-mode", editMode);
   document.getElementById("editToggle").textContent = editMode ? "✓ Gotowe" : "✎ Edytuj";
+  document.getElementById("editToggle").style.display = isReadOnly ? "none" : "inline-block";
+  updateLastEditLine();
 
   const ev = currentEvent();
   populateEventSelect();
@@ -332,6 +389,7 @@ function render(){
   document.getElementById("subInput").style.display = editMode ? "block" : "none";
   document.getElementById("cloudBadge").style.display = ev.cloudId ? "inline-block" : "none";
   document.getElementById("liveBadge").style.display = ev.cloudId ? "inline-block" : "none";
+  document.getElementById("readonlyBadge").style.display = isReadOnly ? "inline-block" : "none";
 
   document.querySelectorAll(".phase-btn").forEach(b=>{
     b.classList.toggle("active", b.getAttribute("data-phase")===phase);
@@ -343,12 +401,21 @@ function render(){
   updateProgress();
 }
 
+function matchesEquipmentFilter(item, field){
+  if(equipmentFilter==="unchecked") return !item[field];
+  if(equipmentFilter==="unclear") return (item.gdzie||"").indexOf("?")!==-1;
+  return true;
+}
+
 function renderGroups(){
   const wrap = document.getElementById("equipmentGroups");
   wrap.innerHTML = "";
   const ev = currentEvent();
   const field = checkedField();
   ev.groups.forEach((grp)=>{
+    const itemsToShow = editMode ? grp.items : grp.items.filter(it=>matchesEquipmentFilter(it, field));
+    if(!editMode && itemsToShow.length===0) return;
+
     const det = document.createElement("details");
     det.className = "group"; det.open = editMode;
 
@@ -361,7 +428,8 @@ function renderGroups(){
       inp.addEventListener("input", ()=>{ grp.name = inp.value; saveState(); });
       left.appendChild(inp);
     } else { left.textContent = grp.name; }
-    const count = document.createElement("span"); count.className = "group-count"; count.textContent = grp.items.length;
+    const count = document.createElement("span"); count.className = "group-count";
+    count.textContent = editMode ? grp.items.length : (itemsToShow.length===grp.items.length ? itemsToShow.length : itemsToShow.length+"/"+grp.items.length);
     left.appendChild(count);
     summary.appendChild(left);
 
@@ -376,7 +444,7 @@ function renderGroups(){
     summary.appendChild(right);
     det.appendChild(summary);
 
-    grp.items.forEach(item=>{
+    itemsToShow.forEach(item=>{
       const row = document.createElement("div");
       row.className = "item-row" + (item[field] ? " checked" : "");
       const unclear = (item.gdzie||"").indexOf("?")!==-1;
@@ -403,7 +471,7 @@ function renderGroups(){
         txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(noteInp);
         row.appendChild(txt); row.appendChild(del);
       } else {
-        const box = document.createElement("input"); box.type = "checkbox"; box.setAttribute("data-count","1");
+        const box = document.createElement("input"); box.type = "checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
         box.checked = !!item[field];
         box.addEventListener("change", ()=>{ item[field] = box.checked; row.classList.toggle("checked", box.checked); saveState(); updateProgress(); });
         const txt = document.createElement("div"); txt.className = "txt";
@@ -482,7 +550,7 @@ function renderPickups(){
         txt.appendChild(textInp); txt.appendChild(line2); txt.appendChild(noteInp);
         row.appendChild(txt); row.appendChild(del);
       } else {
-        const box = document.createElement("input"); box.type="checkbox"; box.setAttribute("data-count","1");
+        const box = document.createElement("input"); box.type="checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
         box.checked = !!item.checked;
         box.addEventListener("change", ()=>{ item.checked = box.checked; row.classList.toggle("checked", box.checked); saveState(); updateProgress(); });
         const txt = document.createElement("div"); txt.className="txt";
@@ -552,6 +620,13 @@ document.getElementById("subInput").addEventListener("input", e=>{ currentEvent(
 document.querySelectorAll(".phase-btn").forEach(b=>{
   b.addEventListener("click", ()=>{ phase = b.getAttribute("data-phase"); render(); });
 });
+document.querySelectorAll(".filter-chip").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    equipmentFilter = b.getAttribute("data-filter");
+    document.querySelectorAll(".filter-chip").forEach(x=>x.classList.toggle("active", x===b));
+    renderGroups();
+  });
+});
 
 document.getElementById("eventSelect").addEventListener("change", (e)=>{
   state.currentId = e.target.value; saveLocalOnly(); render(); updateAddressBar();
@@ -565,6 +640,22 @@ document.getElementById("newEventBtn").addEventListener("click", ()=>{
   state.events[ev.id] = ev; state.currentId = ev.id;
   saveLocalOnly(); render(); updateAddressBar();
   ensureCloud(ev);
+});
+document.getElementById("duplicateEventBtn").addEventListener("click", ()=>{
+  const src = currentEvent();
+  const name = prompt("Nazwa duplikatu:", src.title + " (kopia)");
+  if(name===null) return;
+  const clone = JSON.parse(JSON.stringify(src));
+  clone.id = uid();
+  clone.cloudId = null;
+  clone.title = name.trim() || (src.title + " (kopia)");
+  clone.lastEdit = null;
+  clone.groups.forEach(g=>{ g.id = uid(); g.items.forEach(it=>{ it.id = uid(); it.checked = false; it.checkedReturn = false; }); });
+  clone.pickups.forEach(g=>{ g.id = uid(); g.items.forEach(it=>{ it.id = uid(); it.checked = false; }); });
+  clone.infoCards.forEach(c=>{ c.id = uid(); });
+  state.events[clone.id] = clone; state.currentId = clone.id;
+  saveLocalOnly(); render(); updateAddressBar();
+  ensureCloud(clone);
 });
 document.getElementById("deleteEventBtn").addEventListener("click", ()=>{
   const ids = Object.keys(state.events);
@@ -697,24 +788,30 @@ document.getElementById("warehouseBtn").addEventListener("click", ()=>{
 const shareModal = document.getElementById("shareModal");
 const shareBody = document.getElementById("shareBody");
 
-function shareUrlFor(cloudId){
-  return location.origin + location.pathname + "#cloud=" + cloudId;
+function shareUrlFor(cloudId, readOnly){
+  return location.origin + location.pathname + "#cloud=" + cloudId + (readOnly ? "&ro=1" : "");
 }
 
 function renderShareModalLinked(ev){
-  const url = shareUrlFor(ev.cloudId);
+  const editUrl = shareUrlFor(ev.cloudId, false);
+  const roUrl = shareUrlFor(ev.cloudId, true);
   shareBody.innerHTML =
-    '<div class="link-box">'+escapeHtml(url)+'</div>'+
-    '<div class="qr-box"><div id="qrCanvas"></div></div>'+
-    '<div class="modal-actions">'+
-      '<button class="btn" id="copyLinkBtn">Kopiuj link</button>'+
-    '</div>'+
-    '<p class="status-msg" id="shareStatus">Każdy z tym linkiem widzi i może edytować te same dane, zmiany pojawiają się na żywo, bez odświeżania.</p>';
-  new QRCode(document.getElementById("qrCanvas"), {text:url, width:180, height:180});
-  document.getElementById("copyLinkBtn").addEventListener("click", ()=>{
-    navigator.clipboard.writeText(url).then(()=>{
-      document.getElementById("shareStatus").textContent = "Link skopiowany.";
-    }).catch(()=>{});
+    '<p class="mini-label-share">Link do edycji</p>'+
+    '<div class="link-box">'+escapeHtml(editUrl)+'</div>'+
+    '<div class="qr-box"><div id="qrCanvasEdit"></div></div>'+
+    '<div class="modal-actions"><button class="btn" id="copyEditBtn">Kopiuj link do edycji</button></div>'+
+    '<p class="mini-label-share" style="margin-top:1rem;">Link tylko do odczytu</p>'+
+    '<div class="link-box">'+escapeHtml(roUrl)+'</div>'+
+    '<div class="qr-box"><div id="qrCanvasRo"></div></div>'+
+    '<div class="modal-actions"><button class="btn" id="copyRoBtn">Kopiuj link tylko do odczytu</button></div>'+
+    '<p class="status-msg" id="shareStatus">Zmiany pojawiają się na żywo, bez odświeżania. Link "tylko do odczytu" ukrywa edycję w interfejsie — to wygoda, nie zabezpieczenie (dane nadal nie są szyfrowane hasłem).</p>';
+  new QRCode(document.getElementById("qrCanvasEdit"), {text:editUrl, width:150, height:150});
+  new QRCode(document.getElementById("qrCanvasRo"), {text:roUrl, width:150, height:150});
+  document.getElementById("copyEditBtn").addEventListener("click", ()=>{
+    navigator.clipboard.writeText(editUrl).then(()=>{ document.getElementById("shareStatus").textContent = "Link do edycji skopiowany."; }).catch(()=>{});
+  });
+  document.getElementById("copyRoBtn").addEventListener("click", ()=>{
+    navigator.clipboard.writeText(roUrl).then(()=>{ document.getElementById("shareStatus").textContent = "Link tylko do odczytu skopiowany."; }).catch(()=>{});
   });
 }
 
@@ -735,10 +832,12 @@ document.getElementById("closeShareBtn").addEventListener("click", closeShare);
 shareModal.addEventListener("click", (e)=>{ if(e.target===shareModal) closeShare(); });
 
 // ---------------- odbiór współdzielonego linku ----------------
+let isReadOnly = false;
 function handleIncomingHash(){
   const m = location.hash.match(/cloud=([a-zA-Z0-9\-]+)/);
   if(!m) return;
   const cloudId = m[1];
+  isReadOnly = /[?&#]ro=1/.test(location.hash) || /ro=1/.test(location.hash);
   history.replaceState(null, "", location.pathname);
   const already = Object.values(state.events).find(e=>e.cloudId===cloudId || e.id===cloudId);
   if(already){
@@ -752,8 +851,28 @@ function handleIncomingHash(){
   saveLocalOnly();
 }
 
+// ---------------- motyw (jasny/ciemny) ----------------
+const THEME_KEY = "logistics-tool-theme";
+function loadTheme(){
+  let saved = null;
+  try{ saved = localStorage.getItem(THEME_KEY); }catch(e){}
+  const dark = saved ? saved === "dark" : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.body.classList.toggle("dark", !!dark);
+  updateThemeIcon();
+}
+function toggleTheme(){
+  const isDark = document.body.classList.toggle("dark");
+  try{ localStorage.setItem(THEME_KEY, isDark ? "dark" : "light"); }catch(e){}
+  updateThemeIcon();
+}
+function updateThemeIcon(){
+  document.getElementById("themeToggle").textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
+}
+document.getElementById("themeToggle").addEventListener("click", toggleTheme);
+
 // ---------------- init ----------------
 (function init(){
+  loadTheme();
   loadState();
   handleIncomingHash();
   render();
