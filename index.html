@@ -27,7 +27,8 @@
   .wrap{max-width:480px;margin:0 auto;padding:0 1rem;}
   a{color:var(--green-deep);}
 
-  header.top{position:sticky;top:0;z-index:10;background:var(--green);color:#fff;padding:1.1rem 7.6rem 1rem 1rem;border-bottom:3px solid var(--green-deep);}
+  .sticky-top{position:sticky;top:0;z-index:15;}
+  header.top{background:var(--green);color:#fff;padding:1.1rem 9.5rem 1rem 1rem;border-bottom:3px solid var(--green-deep);}
   header.top .eyebrow{font-size:12.5px;color:#CFEAD9;margin:0 0 6px;}
   header.top h1{font-size:20px;font-weight:700;margin:0;border:none;background:none;color:#fff;padding:0;display:inline;}
   header.top .sub{font-size:13px;color:#DCEFE3;margin:2px 0 8px;}
@@ -39,10 +40,11 @@
   .icon-btn{flex:none;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35);
     border-radius:8px;padding:6px 9px;font-size:13px;cursor:pointer;font-weight:700;}
 
-  .fab{position:absolute;top:1rem;right:1rem;z-index:20;background:rgba(255,255,255,.16);color:#fff;
-    border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;}
+  .header-actions{position:absolute;top:1rem;right:1rem;z-index:20;display:flex;align-items:center;gap:8px;}
+  .fab{flex:none;background:rgba(255,255,255,.16);color:#fff;
+    border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
   body.edit-mode .fab{background:var(--lime);color:var(--green-deep);border-color:var(--lime);}
-  .theme-toggle{position:absolute;top:1rem;right:5.6rem;z-index:20;background:rgba(255,255,255,.16);color:#fff;
+  .theme-toggle{flex:none;background:rgba(255,255,255,.16);color:#fff;
     border:1px solid rgba(255,255,255,.4);border-radius:999px;width:34px;height:34px;font-size:15px;cursor:pointer;}
 
   .phase-toggle{display:flex;background:rgba(255,255,255,.14);border-radius:999px;padding:3px;margin:.4rem 0;}
@@ -139,9 +141,12 @@
 <body>
 <div class="wrap">
 
+  <div class="sticky-top">
   <header class="top">
-    <button type="button" class="fab" id="editToggle">✎ Edytuj</button>
-    <button type="button" class="theme-toggle" id="themeToggle" title="Przełącz motyw">🌙</button>
+    <div class="header-actions">
+      <button type="button" class="theme-toggle" id="themeToggle" title="Przełącz motyw">🌙</button>
+      <button type="button" class="fab" id="editToggle">✎ Edytuj</button>
+    </div>
     <p class="eyebrow">Narzędzie do ściąg logistycznych</p>
 
     <div class="event-row">
@@ -175,6 +180,7 @@
     <a href="#info">Info</a>
     <button type="button" class="chip-btn" id="shareBtn">🔗 Udostępnij</button>
   </nav>
+  </div>
 
   <div class="toolbar edit-only">
     <button class="btn" id="exportBtn">Eksportuj do Excela</button>
