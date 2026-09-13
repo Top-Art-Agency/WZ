@@ -6,12 +6,12 @@
 <title>Ściąga logistyczna — narzędzie</title>
 <style>
   :root{
-    --bg:#F7F5EE; --paper:#FFFFFF; --ink:#201F1B; --muted:#6E6C63; --line:#E4E1D6;
-    --green:#0E6B44; --green-deep:#0A4E32; --lime:#D8E76B; --amber:#F2A93B; --amber-deep:#6B4708; --red:#C1462F;
+    --bg:#edf2f6; --paper:#fff; --ink:#152b3b; --muted:#647786; --line:#dbe4eb; --soft:#f6f9fb;
+    --green:#176861; --green-deep:#104e48; --lime:#c4e987; --amber:#e9a445; --amber-deep:#81521c; --red:#b94746;
   }
   body.dark{
-    --bg:#14181B; --paper:#1E2327; --ink:#ECEAE2; --muted:#9B988D; --line:#323A3E;
-    --amber-deep:#F2C77A; --red:#E0665A;
+    --bg:#101b23; --paper:#192934; --ink:#eaf3f8; --muted:#a8bac7; --line:#304550; --soft:#15252f;
+    --green:#1c7067; --green-deep:#b7eadb; --amber-deep:#f2cc82; --red:#ff9997;
   }
   body.dark .btn{ background:var(--paper); color:var(--ink); border-color:var(--line); }
   body.dark input.field, body.dark textarea.field, body.dark select.field{ background:var(--paper); color:var(--ink); border-color:var(--line); }
@@ -22,7 +22,10 @@
   body.dark .rule-card strong{ color:var(--amber-deep); }
   body.dark .theme-toggle{ background:rgba(255,255,255,.16); }
   *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
   html,body{margin:0;padding:0;}
+  button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible{outline:3px solid #24998a;outline-offset:2px;}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} *{transition:none !important;} }
   body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.45;padding-bottom:3rem;}
   .wrap{max-width:480px;margin:0 auto;padding:0 1rem;}
   a{color:var(--green-deep);}
@@ -136,10 +139,56 @@
   .modal .modal-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:.6rem;}
   .modal .status-msg{font-size:12.5px;margin-top:.5rem;}
   .modal .mini-label-share{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:.2rem 0 .3rem;}
+  #syncNotice{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--paper);color:var(--ink);
+    border:1px solid var(--line);border-left:4px solid var(--red);padding:12px 18px;border-radius:9px;
+    box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:150;max-width:calc(100% - 32px);width:420px;font-size:13.5px;line-height:1.5;}
+  .empty-panel{border:1px dashed var(--line);border-radius:11px;background:var(--paper);padding:24px 18px;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.7;}
+  .empty-panel strong{display:block;color:var(--ink);font-size:14.5px;margin-bottom:4px;}
+  @media print{
+    .header-actions, .event-row, .toolbar, nav.chips, .edit-only, .edit-only-inline, .modal-overlay, #syncNotice{display:none !important;}
+    .wrap{max-width:none;padding:0;}
+    body{background:#fff;color:#111;}
+    details.group{break-inside:avoid;}
+    .item-row{break-inside:avoid;}
+  }
+
+  /* ---------------- masthead (marka firmy) ---------------- */
+  .masthead{display:flex;align-items:center;gap:14px;padding:18px 0;}
+  .wz-mark{background:var(--ink);color:var(--paper);border-radius:10px;padding:8px 10px;font-size:18px;font-weight:800;letter-spacing:-1px;flex:none;}
+  .wordmark{display:flex;gap:14px;align-items:center;}
+  .wordmark strong{font-size:15px;letter-spacing:-.2px;display:block;color:var(--ink);}
+  .wordmark small{display:block;color:var(--muted);font-size:12px;margin-top:2px;}
+
+  /* ---------------- układ komputerowy (od ~860px) ---------------- */
+  @media (min-width: 860px){
+    .wrap{max-width:1100px;padding:0 32px;}
+    .masthead{padding:24px 0;border-bottom:1px solid var(--line);margin-bottom:24px;}
+
+    header.top{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);column-gap:40px;
+      padding:1.7rem 2rem;border-radius:14px;}
+    .header-actions{position:static;grid-column:2;grid-row:1;justify-self:end;align-self:start;}
+    .event-row{grid-column:1;grid-row:1;max-width:520px;}
+    .top>.eyebrow, #titleView, #subView, #titleInput, #subInput{grid-column:1;}
+    .phase-toggle{grid-column:2;grid-row:2;align-self:start;max-width:280px;justify-self:end;margin-top:0;}
+    .progress-row{grid-column:2;grid-row:3;max-width:280px;justify-self:end;}
+    .last-edit{grid-column:1 / -1;}
+
+    nav.chips{padding:1rem 0;background:transparent;border-bottom:none;}
+
+    .content-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,1fr);gap:28px;align-items:start;}
+    .secondary-column{display:grid;gap:28px;}
+    section{padding:0;border-bottom:none;}
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <div class="masthead">
+    <div class="wordmark">
+      <span class="wz-mark">WZ</span>
+      <div><strong>Top-Art</strong><small>Logistyka wydarzenia</small></div>
+    </div>
+  </div>
 
   <div class="sticky-top">
   <header class="top">
@@ -167,7 +216,7 @@
     </div>
 
     <div class="progress-row">
-      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-track" role="progressbar" aria-label="Postęp kompletowania" aria-valuemin="0" aria-valuemax="100"><div class="progress-fill" id="progressFill"></div></div>
       <span class="progress-label" id="progressLabel">0 / 0</span>
       <span class="cloud-badge" id="liveBadge" style="display:none;">● na żywo</span>
     </div>
@@ -190,6 +239,7 @@
     <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none;">
   </div>
 
+  <div class="content-grid">
   <section id="sprzet">
     <h2 class="section-title">Sprzęt / rzeczy do zabrania</h2>
     <p class="section-sub">Grupuj wg osoby odpowiedzialnej. Przełącz fazę na górze, żeby odhaczać załadunek albo rozładunek.</p>
@@ -202,6 +252,7 @@
     <div class="edit-only"><button class="btn" id="addGroupBtn">+ Dodaj grupę (osobę)</button></div>
   </section>
 
+  <div class="secondary-column">
   <section id="odbiory">
     <h2 class="section-title">Odbiory / inne checklisty</h2>
     <p class="section-sub">Osobne listy rzeczy do odebrania z różnych miejsc.</p>
@@ -215,6 +266,8 @@
     <div id="infoCards"></div>
     <div class="edit-only"><button class="btn" id="addInfoBtn">+ Dodaj kartę informacyjną</button></div>
   </section>
+  </div>
+  </div>
 
   <footer class="legend" id="legendText">Każdy event zapisuje się automatycznie we wspólnej bazie — wyślij link z paska adresu (albo z "🔗 Udostępnij"), żeby ktoś inny widział i edytował te same dane.</footer>
 </div>
@@ -230,6 +283,7 @@
   </div>
 </div>
 
+<div id="syncNotice" role="status" aria-live="polite" hidden></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -248,6 +302,31 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const liveRefs = {};
+const groupOpenState = new Map();
+const deferredSnapshots = new Map();
+let noticeTimer;
+function showNotice(message){
+  const el = document.getElementById("syncNotice");
+  if(!el) return;
+  el.textContent = message; el.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(()=>{ el.hidden = true; }, 6000);
+}
+function normalizeEvent(ev){
+  if(!ev) return ev;
+  const list = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v==="object" ? Object.values(v).filter(Boolean) : []);
+  ev.groups = list(ev.groups); ev.pickups = list(ev.pickups); ev.infoCards = list(ev.infoCards);
+  [...ev.groups, ...ev.pickups].forEach(g=>{ g.items = list(g.items); });
+  return ev;
+}
+function keepGroupOpen(det, key){
+  det.dataset.openKey = key;
+  det.open = editMode || (groupOpenState.has(key) ? groupOpenState.get(key) : true);
+  det.addEventListener("toggle", ()=>{ if(det.isConnected && !editMode) groupOpenState.set(key, det.open); });
+}
+function rememberOpenGroups(){
+  document.querySelectorAll("details[data-open-key]").forEach(d=>{ if(!editMode) groupOpenState.set(d.dataset.openKey, d.open); });
+}
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
 function blankEvent(title, forcedId){
@@ -271,19 +350,31 @@ function attachLiveSync(ev){
     const val = snap.val();
     if(val){
       val.id = ev.id;
-      state.events[ev.id] = val;
-      saveLocalOnly();
+      normalizeEvent(val);
       const focusEl = document.activeElement;
-      const typing = focusEl && (focusEl.tagName==="INPUT" || focusEl.tagName==="TEXTAREA");
-      if(state.currentId===ev.id && !typing) render();
-    } else {
-      // ścieżka jeszcze nie istnieje w bazie — wypchnij to, co mamy lokalnie
-      ref.set(state.events[ev.id] || ev).catch(()=>{});
+      const typing = state.currentId===ev.id && focusEl && (focusEl.tagName==="INPUT" || focusEl.tagName==="TEXTAREA");
+      if(typing){
+        // nie nadpisuj danych pod palcami piszącej osoby — zastosuj dopiero po opuszczeniu pola
+        deferredSnapshots.set(ev.id, val);
+      } else {
+        state.events[ev.id] = val;
+        saveLocalOnly();
+        if(state.currentId===ev.id) render();
+      }
+    } else if(!isReadOnly){
+      // ścieżka jeszcze nie istnieje w bazie — wypchnij to, co mamy lokalnie (ale nigdy z linku tylko-do-odczytu)
+      ref.set(state.events[ev.id] || ev).catch(()=>showNotice("Nie udało się utworzyć eventu w bazie. Sprawdź połączenie."));
     }
-  }, ()=>{ /* błąd nasłuchu — zignoruj, spróbuje ponownie przy kolejnej zmianie */ });
+  }, ()=>{ showNotice("Nie można połączyć się ze wspólną bazą. Sprawdź internet."); });
 }
 
 function ensureCloud(ev){
+  const isNew = !ev.cloudId;
+  if(isNew && !isReadOnly){
+    // transakcja: tworzy wpis tylko jeśli jeszcze nie istnieje — chroni przed nadpisaniem, gdy dwie osoby otwierają nowy link jednocześnie
+    db.ref("events/"+ev.id).transaction(existing => existing===null ? JSON.parse(JSON.stringify({...ev, cloudId:ev.id})) : undefined)
+      .catch(()=>showNotice("Nie udało się utworzyć eventu w bazie."));
+  }
   ev.cloudId = ev.id;
   attachLiveSync(ev);
   saveLocalOnly();
@@ -295,7 +386,7 @@ function ensureCloud(ev){
 function updateAddressBar(){
   const ev = currentEvent();
   if(ev && ev.cloudId){
-    history.replaceState(null, "", location.pathname + "#cloud=" + ev.cloudId);
+    history.replaceState(null, "", location.pathname + "#cloud=" + ev.cloudId + (isReadOnly ? "&ro=1" : ""));
   } else {
     history.replaceState(null, "", location.pathname);
   }
@@ -304,7 +395,14 @@ function updateAddressBar(){
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw){ state = JSON.parse(raw); return; }
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(parsed.events && parsed.currentId && parsed.events[parsed.currentId]){
+        state = parsed;
+        Object.values(state.events).forEach(normalizeEvent);
+        return;
+      }
+    }
   }catch(e){}
   const ev = blankEvent("Ściąga logistyczna");
   ev.groups = [{id:uid(), name:"Osoba 1", items:[{id:uid(), co:"Przykładowy przedmiot", gdzie:"lokalizacja", ilosc:1, notatka:"", checked:false, checkedReturn:false}]}];
@@ -312,6 +410,7 @@ function loadState(){
   state = { currentId: ev.id, events: { [ev.id]: ev } };
 }
 function saveState(){
+  if(isReadOnly) return;
   const ev = currentEvent();
   if(ev){ ev.lastEdit = { by: getUserName(), at: Date.now() }; }
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
@@ -341,12 +440,16 @@ function updateLastEditLine(){
 function currentEvent(){ return state.events[state.currentId]; }
 
 // ---------------- cloud sync (Firebase Realtime Database, żywa synchronizacja) ----------------
-let pushTimer = null;
+const pushTimers = new Map();
 function pushCloudDebounced(){
   const ev = currentEvent();
-  if(!ev || !ev.cloudId) return;
-  clearTimeout(pushTimer);
-  pushTimer = setTimeout(()=>{ db.ref("events/"+ev.cloudId).set(ev).catch(()=>{}); }, 500);
+  if(!ev || !ev.cloudId || isReadOnly) return;
+  clearTimeout(pushTimers.get(ev.id));
+  deferredSnapshots.delete(ev.id);
+  pushTimers.set(ev.id, setTimeout(()=>{
+    db.ref("events/"+ev.cloudId).set(ev).catch(()=>showNotice("Nie udało się zapisać zmian w bazie. Kopia lokalna została zachowana."));
+    pushTimers.delete(ev.id);
+  }, 500));
 }
 function saveLocalOnly(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
@@ -358,11 +461,17 @@ function escapeHtml(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"
 function checkedField(){ return phase==="load" ? "checked" : "checkedReturn"; }
 
 function updateProgress(){
-  const boxes = document.querySelectorAll('input[type=checkbox][data-count]');
-  let total = boxes.length, checked = 0;
-  boxes.forEach(b=>{ if(b.checked) checked++; });
-  document.getElementById("progressFill").style.width = total ? (checked/total*100)+"%" : "0%";
+  const ev = currentEvent();
+  if(!ev) return;
+  const field = checkedField();
+  const items = ev.groups.flatMap(g=>g.items).map(it=>!!it[field])
+    .concat(ev.pickups.flatMap(g=>g.items).map(it=>!!it.checked));
+  const total = items.length, checked = items.filter(Boolean).length;
+  const pct = total ? Math.round(checked/total*100) : 0;
+  document.getElementById("progressFill").style.width = pct+"%";
   document.getElementById("progressLabel").textContent = checked+" / "+total;
+  const track = document.querySelector(".progress-track");
+  if(track) track.setAttribute("aria-valuenow", pct);
 }
 
 function populateEventSelect(){
@@ -377,6 +486,8 @@ function populateEventSelect(){
 }
 
 function render(){
+  rememberOpenGroups();
+  normalizeEvent(currentEvent());
   document.body.classList.toggle("edit-mode", editMode);
   document.getElementById("editToggle").textContent = editMode ? "✓ Gotowe" : "✎ Edytuj";
   document.getElementById("editToggle").style.display = isReadOnly ? "none" : "inline-block";
@@ -402,6 +513,7 @@ function render(){
   });
 
   renderGroups();
+  equipmentEmpty();
   renderPickups();
   renderInfoCards();
   updateProgress();
@@ -411,6 +523,15 @@ function matchesEquipmentFilter(item, field){
   if(equipmentFilter==="unchecked") return !item[field];
   if(equipmentFilter==="unclear") return (item.gdzie||"").indexOf("?")!==-1;
   return true;
+}
+
+function equipmentEmpty(){
+  const w = document.getElementById("equipmentGroups");
+  if(w.children.length) return;
+  const msg = equipmentFilter==="all"
+    ? '<strong>Lista jest jeszcze pusta</strong>Włącz edycję, aby dodać osoby i sprzęt.'
+    : '<strong>Brak pozycji dla tego filtra</strong>Wybierz inny filtr, aby zobaczyć pozostałe pozycje.';
+  w.innerHTML = '<div class="empty-panel">'+msg+'</div>';
 }
 
 function renderGroups(){
@@ -423,7 +544,7 @@ function renderGroups(){
     if(!editMode && itemsToShow.length===0) return;
 
     const det = document.createElement("details");
-    det.className = "group"; det.open = editMode;
+    det.className = "group"; keepGroupOpen(det, ev.id+"/sprzet/"+grp.id);
 
     const summary = document.createElement("summary"); summary.className = "group-head";
     const left = document.createElement("span"); left.className = "group-head-left";
@@ -479,6 +600,7 @@ function renderGroups(){
       } else {
         const box = document.createElement("input"); box.type = "checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
         box.checked = !!item[field];
+        box.setAttribute("aria-label", (phase==="load" ? "Załadowano: " : "Rozładowano: ") + item.co);
         box.addEventListener("change", ()=>{ item[field] = box.checked; row.classList.toggle("checked", box.checked); saveState(); updateProgress(); });
         const txt = document.createElement("div"); txt.className = "txt";
         const qty = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc;
@@ -504,6 +626,7 @@ function renderGroups(){
       const errMsg = document.createElement("p"); errMsg.className = "add-error-msg"; errMsg.textContent = "Wpisz nazwę przedmiotu w polu \"Co\", zanim dodasz.";
       det.appendChild(errMsg);
       addBtn.addEventListener("click", ()=>{
+        if(!Number.isSafeInteger(Number(iloscI.value)) || Number(iloscI.value)<1){ showNotice("Ilość musi być dodatnią liczbą całkowitą."); iloscI.focus(); return; }
         if(!coI.value.trim()){ coI.classList.add("error"); errMsg.classList.add("show"); coI.focus(); return; }
         grp.items.push({id:uid(), co:coI.value.trim(), gdzie:gdzieI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:"", checked:false, checkedReturn:false});
         saveState(); render();
@@ -519,7 +642,7 @@ function renderPickups(){
   wrap.innerHTML = "";
   const ev = currentEvent();
   ev.pickups.forEach(grp=>{
-    const det = document.createElement("details"); det.className = "group"; det.open = editMode;
+    const det = document.createElement("details"); det.className = "group"; keepGroupOpen(det, ev.id+"/odbior/"+grp.id);
     const summary = document.createElement("summary"); summary.className = "group-head";
     const left = document.createElement("span"); left.className="group-head-left";
     if(editMode){
@@ -558,6 +681,7 @@ function renderPickups(){
       } else {
         const box = document.createElement("input"); box.type="checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
         box.checked = !!item.checked;
+        box.setAttribute("aria-label", "Odebrano: " + item.text);
         box.addEventListener("change", ()=>{ item.checked = box.checked; row.classList.toggle("checked", box.checked); saveState(); updateProgress(); });
         const txt = document.createElement("div"); txt.className="txt";
         const qty = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc;
@@ -581,6 +705,7 @@ function renderPickups(){
       const errMsg = document.createElement("p"); errMsg.className = "add-error-msg"; errMsg.textContent = "Wpisz treść pozycji, zanim dodasz.";
       det.appendChild(errMsg);
       addBtn.addEventListener("click", ()=>{
+        if(!Number.isSafeInteger(Number(iloscI.value)) || Number(iloscI.value)<1){ showNotice("Ilość musi być dodatnią liczbą całkowitą."); iloscI.focus(); return; }
         if(!textI.value.trim()){ textI.classList.add("error"); errMsg.classList.add("show"); textI.focus(); return; }
         grp.items.push({id:uid(), text:textI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:"", checked:false});
         saveState(); render();
@@ -631,6 +756,7 @@ document.querySelectorAll(".filter-chip").forEach(b=>{
     equipmentFilter = b.getAttribute("data-filter");
     document.querySelectorAll(".filter-chip").forEach(x=>x.classList.toggle("active", x===b));
     renderGroups();
+    equipmentEmpty();
   });
 });
 
@@ -668,8 +794,9 @@ document.getElementById("deleteEventBtn").addEventListener("click", ()=>{
   if(ids.length<=1){ alert("To jedyny event — nie można go usunąć."); return; }
   if(!confirm('Usunąć event "'+currentEvent().title+'"? Tej operacji nie da się cofnąć.')) return;
   const oldEv = currentEvent();
+  clearTimeout(pushTimers.get(oldEv.id)); pushTimers.delete(oldEv.id); deferredSnapshots.delete(oldEv.id);
   if(liveRefs[oldEv.id]){ liveRefs[oldEv.id].off(); delete liveRefs[oldEv.id]; }
-  if(oldEv.cloudId) db.ref("events/"+oldEv.cloudId).remove().catch(()=>{});
+  if(oldEv.cloudId) db.ref("events/"+oldEv.cloudId).remove().catch(()=>showNotice("Nie udało się usunąć eventu ze wspólnej bazy."));
   delete state.events[state.currentId];
   state.currentId = Object.keys(state.events)[0];
   saveLocalOnly(); render(); updateAddressBar();
@@ -830,12 +957,31 @@ function openShare(){
   const ev = currentEvent();
   shareModal.classList.add("show");
   if(ev.cloudId) renderShareModalLinked(ev); else renderShareModalLoading(ev);
+  document.getElementById("closeShareBtn").focus();
 }
-function closeShare(){ shareModal.classList.remove("show"); }
+function closeShare(){ shareModal.classList.remove("show"); document.getElementById("shareBtn").focus(); }
 
 document.getElementById("shareBtn").addEventListener("click", openShare);
 document.getElementById("closeShareBtn").addEventListener("click", closeShare);
 shareModal.addEventListener("click", (e)=>{ if(e.target===shareModal) closeShare(); });
+document.addEventListener("keydown", (e)=>{
+  if(!shareModal.classList.contains("show")) return;
+  if(e.key==="Escape"){ closeShare(); return; }
+  if(e.key==="Tab"){
+    const list = Array.from(shareModal.querySelectorAll("button,a,input")).filter(el=>!el.disabled);
+    if(!list.length) return;
+    const first = list[0], last = list[list.length-1];
+    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+  }
+});
+document.querySelectorAll("nav.chips a").forEach(a=>{
+  a.addEventListener("click", (e)=>{
+    e.preventDefault();
+    const target = document.querySelector(a.getAttribute("href"));
+    if(target) target.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  });
+});
 
 // ---------------- odbiór współdzielonego linku ----------------
 let isReadOnly = false;
@@ -877,6 +1023,20 @@ function updateThemeIcon(){
 document.getElementById("themeToggle").addEventListener("click", toggleTheme);
 
 // ---------------- init ----------------
+document.addEventListener("focusout", ()=>{
+  setTimeout(()=>{
+    const el = document.activeElement;
+    if(el && (el.tagName==="INPUT" || el.tagName==="TEXTAREA")) return;
+    const id = state.currentId;
+    if(deferredSnapshots.has(id) && !pushTimers.has(id)){
+      state.events[id] = deferredSnapshots.get(id);
+      deferredSnapshots.delete(id);
+      saveLocalOnly();
+      render();
+    }
+  }, 0);
+});
+
 (function init(){
   loadTheme();
   loadState();
