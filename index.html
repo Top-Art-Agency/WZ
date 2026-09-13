@@ -139,7 +139,7 @@
     <div class="progress-row">
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
       <span class="progress-label" id="progressLabel">0 / 0</span>
-      <button type="button" class="icon-btn" id="refreshBtn" title="Odśwież dane współdzielone" style="display:none;">🔄</button>
+      <span class="cloud-badge" id="liveBadge" style="display:none;">● na żywo</span>
     </div>
   </header>
 
@@ -195,14 +195,27 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
 const STORAGE_KEY = "logistics-tool-v2";
-const CLOUD_API = "https://jsonblob.com/api/jsonBlob";
+const firebaseConfig = {
+  apiKey: "AIzaSyA64yUIhCusvODkqMs_1NHLOikkR6Zie0M",
+  authDomain: "wuzetka-5105c.firebaseapp.com",
+  databaseURL: "https://wuzetka-5105c-default-rtdb.firebaseio.com",
+  projectId: "wuzetka-5105c",
+  storageBucket: "wuzetka-5105c.firebasestorage.app",
+  messagingSenderId: "207666711819",
+  appId: "1:207666711819:web:e796c17e764174b36a660e",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const liveRefs = {};
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
-function blankEvent(title){
+function blankEvent(title, forcedId){
   return {
-    id: uid(), title: title || "Nowy event", subtitle: "",
+    id: forcedId || uid(), title: title || "Nowy event", subtitle: "",
     cloudId: null,
     groups: [], pickups: [], infoCards: [],
   };
@@ -211,25 +224,36 @@ function blankEvent(title){
 let state = { currentId: null, events: {} };
 let editMode = false;
 let phase = "load"; // "load" = załadunek (checked), "unload" = rozładunek (checkedReturn)
-let refreshTimer = null;
 
-async function ensureCloud(ev){
-  if(ev.cloudId || ev._creatingCloud) return;
-  ev._creatingCloud = true;
-  try{
-    const id = await cloudCreate(ev);
-    ev.cloudId = id;
-    saveLocalOnly();
-    updateAddressBar();
-    const badge = document.getElementById("cloudBadge");
-    if(badge && ev.id===state.currentId) badge.style.display = "inline-block";
-    const refreshBtn = document.getElementById("refreshBtn");
-    if(refreshBtn && ev.id===state.currentId) refreshBtn.style.display = "inline-block";
-  }catch(e){
-    // po prostu spróbujemy przy kolejnej zmianie / renderze
-  }
-  ev._creatingCloud = false;
+function attachLiveSync(ev){
+  if(liveRefs[ev.id]) return;
+  const ref = db.ref("events/" + ev.id);
+  liveRefs[ev.id] = ref;
+  ref.on("value", (snap)=>{
+    const val = snap.val();
+    if(val){
+      val.id = ev.id;
+      state.events[ev.id] = val;
+      saveLocalOnly();
+      const focusEl = document.activeElement;
+      const typing = focusEl && (focusEl.tagName==="INPUT" || focusEl.tagName==="TEXTAREA");
+      if(state.currentId===ev.id && !typing) render();
+    } else {
+      // ścieżka jeszcze nie istnieje w bazie — wypchnij to, co mamy lokalnie
+      ref.set(state.events[ev.id] || ev).catch(()=>{});
+    }
+  }, ()=>{ /* błąd nasłuchu — zignoruj, spróbuje ponownie przy kolejnej zmianie */ });
 }
+
+function ensureCloud(ev){
+  ev.cloudId = ev.id;
+  attachLiveSync(ev);
+  saveLocalOnly();
+  updateAddressBar();
+  const badge = document.getElementById("cloudBadge");
+  if(badge && ev.id===state.currentId) badge.style.display = "inline-block";
+}
+
 function updateAddressBar(){
   const ev = currentEvent();
   if(ev && ev.cloudId){
@@ -255,60 +279,13 @@ function saveState(){
 }
 function currentEvent(){ return state.events[state.currentId]; }
 
-// ---------------- cloud sync (jsonblob.com, no auth) ----------------
+// ---------------- cloud sync (Firebase Realtime Database, żywa synchronizacja) ----------------
 let pushTimer = null;
 function pushCloudDebounced(){
   const ev = currentEvent();
   if(!ev || !ev.cloudId) return;
   clearTimeout(pushTimer);
-  pushTimer = setTimeout(()=>{ cloudPush(ev.cloudId, ev).catch(()=>{}); }, 700);
-}
-async function cloudCreate(eventData){
-  const res = await fetch(CLOUD_API, {
-    method:"POST",
-    headers:{"Content-Type":"application/json","Accept":"application/json"},
-    body: JSON.stringify(eventData),
-  });
-  if(!res.ok) throw new Error("create failed");
-  const loc = res.headers.get("Location") || "";
-  const id = loc.split("/").pop();
-  if(!id) throw new Error("no id returned");
-  return id;
-}
-async function cloudFetch(id){
-  const res = await fetch(CLOUD_API + "/" + id, {headers:{"Accept":"application/json"}});
-  if(!res.ok) throw new Error("fetch failed");
-  return res.json();
-}
-async function cloudPush(id, data){
-  const res = await fetch(CLOUD_API + "/" + id, {
-    method:"PUT",
-    headers:{"Content-Type":"application/json","Accept":"application/json"},
-    body: JSON.stringify(data),
-  });
-  if(!res.ok) throw new Error("push failed");
-}
-
-function startAutoRefresh(){
-  clearInterval(refreshTimer);
-  refreshTimer = setInterval(()=>{
-    const ev = currentEvent();
-    if(ev && ev.cloudId && !editMode) pullCloud(true);
-  }, 20000);
-}
-
-async function pullCloud(silent){
-  const ev = currentEvent();
-  if(!ev || !ev.cloudId) return;
-  try{
-    const fresh = await cloudFetch(ev.cloudId);
-    fresh.id = ev.id; fresh.cloudId = ev.cloudId;
-    state.events[ev.id] = fresh;
-    saveLocalOnly();
-    render();
-  }catch(e){
-    if(!silent) alert("Nie udało się pobrać danych współdzielonych. Sprawdź połączenie i spróbuj ponownie.");
-  }
+  pushTimer = setTimeout(()=>{ db.ref("events/"+ev.cloudId).set(ev).catch(()=>{}); }, 500);
 }
 function saveLocalOnly(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
@@ -354,7 +331,7 @@ function render(){
   document.getElementById("titleInput").style.display = editMode ? "block" : "none";
   document.getElementById("subInput").style.display = editMode ? "block" : "none";
   document.getElementById("cloudBadge").style.display = ev.cloudId ? "inline-block" : "none";
-  document.getElementById("refreshBtn").style.display = ev.cloudId ? "inline-block" : "none";
+  document.getElementById("liveBadge").style.display = ev.cloudId ? "inline-block" : "none";
 
   document.querySelectorAll(".phase-btn").forEach(b=>{
     b.classList.toggle("active", b.getAttribute("data-phase")===phase);
@@ -579,7 +556,7 @@ document.querySelectorAll(".phase-btn").forEach(b=>{
 document.getElementById("eventSelect").addEventListener("change", (e)=>{
   state.currentId = e.target.value; saveLocalOnly(); render(); updateAddressBar();
   const ev = currentEvent();
-  if(ev.cloudId) pullCloud(true); else ensureCloud(ev);
+  ensureCloud(ev);
 });
 document.getElementById("newEventBtn").addEventListener("click", ()=>{
   const name = prompt("Nazwa nowego eventu:", "Nowy event");
@@ -593,11 +570,14 @@ document.getElementById("deleteEventBtn").addEventListener("click", ()=>{
   const ids = Object.keys(state.events);
   if(ids.length<=1){ alert("To jedyny event — nie można go usunąć."); return; }
   if(!confirm('Usunąć event "'+currentEvent().title+'"? Tej operacji nie da się cofnąć.')) return;
+  const oldEv = currentEvent();
+  if(liveRefs[oldEv.id]){ liveRefs[oldEv.id].off(); delete liveRefs[oldEv.id]; }
+  if(oldEv.cloudId) db.ref("events/"+oldEv.cloudId).remove().catch(()=>{});
   delete state.events[state.currentId];
   state.currentId = Object.keys(state.events)[0];
-  saveLocalOnly(); render();
+  saveLocalOnly(); render(); updateAddressBar();
+  ensureCloud(currentEvent());
 });
-document.getElementById("refreshBtn").addEventListener("click", ()=>pullCloud(false));
 
 document.getElementById("addGroupBtn").addEventListener("click", ()=>{ currentEvent().groups.push({id:uid(), name:"Nowa grupa", items:[]}); saveState(); render(); });
 document.getElementById("addPickupBtn").addEventListener("click", ()=>{ currentEvent().pickups.push({id:uid(), name:"Nowa lista odbioru", items:[]}); saveState(); render(); });
@@ -729,7 +709,7 @@ function renderShareModalLinked(ev){
     '<div class="modal-actions">'+
       '<button class="btn" id="copyLinkBtn">Kopiuj link</button>'+
     '</div>'+
-    '<p class="status-msg" id="shareStatus">Każdy z tym linkiem widzi i może edytować te same dane. Zmiany innych zobaczysz po odświeżeniu (🔄) albo automatycznie co ok. 20 sekund.</p>';
+    '<p class="status-msg" id="shareStatus">Każdy z tym linkiem widzi i może edytować te same dane, zmiany pojawiają się na żywo, bez odświeżania.</p>';
   new QRCode(document.getElementById("qrCanvas"), {text:url, width:180, height:180});
   document.getElementById("copyLinkBtn").addEventListener("click", ()=>{
     navigator.clipboard.writeText(url).then(()=>{
@@ -739,12 +719,8 @@ function renderShareModalLinked(ev){
 }
 
 function renderShareModalLoading(ev){
-  shareBody.innerHTML = '<p class="status-msg">Włączam współdzielenie…</p>';
-  ensureCloud(ev).then(()=>{
-    if(!shareModal.classList.contains("show")) return;
-    if(ev.cloudId) renderShareModalLinked(ev);
-    else shareBody.innerHTML = '<p class="status-msg">Nie udało się połączyć z usługą współdzielenia. Sprawdź internet i spróbuj otworzyć "Udostępnij" ponownie.</p>';
-  });
+  ensureCloud(ev);
+  renderShareModalLinked(ev);
 }
 
 function openShare(){
@@ -759,34 +735,28 @@ document.getElementById("closeShareBtn").addEventListener("click", closeShare);
 shareModal.addEventListener("click", (e)=>{ if(e.target===shareModal) closeShare(); });
 
 // ---------------- odbiór współdzielonego linku ----------------
-async function handleIncomingHash(){
+function handleIncomingHash(){
   const m = location.hash.match(/cloud=([a-zA-Z0-9\-]+)/);
   if(!m) return;
   const cloudId = m[1];
   history.replaceState(null, "", location.pathname);
-  try{
-    const fresh = await cloudFetch(cloudId);
-    const already = Object.values(state.events).find(e=>e.cloudId===cloudId);
-    if(already){
-      state.currentId = already.id;
-    } else {
-      const ev = blankEvent(fresh.title || "Współdzielony event");
-      Object.assign(ev, fresh, {id: ev.id, cloudId: cloudId});
-      state.events[ev.id] = ev;
-      state.currentId = ev.id;
-    }
-    saveLocalOnly();
-  }catch(e){
-    alert("Nie udało się wczytać współdzielonego eventu spod tego linku.");
+  const already = Object.values(state.events).find(e=>e.cloudId===cloudId || e.id===cloudId);
+  if(already){
+    state.currentId = already.id;
+  } else {
+    const ev = blankEvent("Współdzielony event", cloudId);
+    ev.cloudId = cloudId;
+    state.events[ev.id] = ev;
+    state.currentId = ev.id;
   }
+  saveLocalOnly();
 }
 
 // ---------------- init ----------------
-(async function init(){
+(function init(){
   loadState();
-  await handleIncomingHash();
+  handleIncomingHash();
   render();
-  startAutoRefresh();
   updateAddressBar();
   ensureCloud(currentEvent());
 })();
