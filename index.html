@@ -330,6 +330,7 @@
 </div>
 
 <div id="syncNotice" role="status" aria-live="polite" hidden></div>
+<button type="button" id="editFloat" aria-label="Tryb edycji">✎ Edytuj</button>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -942,49 +943,92 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
   const reader = new FileReader();
   reader.onload = ()=>{
     try{
-      const wb = XLSX.read(reader.result, {type:"array"});
-      const isChecked = v => ["tak","1","true","x","yes"].includes(String(v||"").trim().toLowerCase());
+      const wb = XLSX.read(new Uint8Array(reader.result), {type:"array"});
+      const norm = v => String(v==null?"":v).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/ł/g,"l");
+      const isChecked = v => ["tak","1","true","x","yes","t"].includes(norm(v));
+      const num = v => { const n = parseFloat(String(v==null?"":v).replace(",",".")); return isFinite(n)&&n>0 ? n : 1; };
+      const sheetByName = name => { const k = wb.SheetNames.find(n=>norm(n)===norm(name)); return k ? wb.Sheets[k] : null; };
+      const rowsOf = ws => XLSX.utils.sheet_to_json(ws, {header:1, defval:"", blankrows:false});
+      // znajdź kolumnę po nagłówku (kilka możliwych nazw), inaczej użyj pozycji domyślnej
+      const colMap = (hdr, spec) => { const out={}; Object.keys(spec).forEach((k,i)=>{ const idx = hdr.findIndex(h=>spec[k].includes(norm(h))); out[k]=idx; }); return out; };
       const ev = currentEvent();
+      const used = new Set();
       let newTitle = ev.title, newSub = ev.subtitle;
-      if(wb.Sheets["Ustawienia"]){
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets["Ustawienia"], {header:1});
-        rows.forEach(r=>{
-          if((r[0]||"").toString().trim()==="Tytuł") newTitle = r[1]||"";
-          if((r[0]||"").toString().trim()==="Podtytuł") newSub = r[1]||"";
+      const wsSet = sheetByName("Ustawienia");
+      if(wsSet){ used.add(wsSet);
+        rowsOf(wsSet).forEach(r=>{
+          if(norm(r[0])==="tytul") newTitle = r[1]||"";
+          if(norm(r[0])==="podtytul") newSub = r[1]||"";
         });
       }
-      let groups = [];
-      if(wb.Sheets["Sprzęt"]){
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets["Sprzęt"], {header:1}).slice(1);
+      let groups = null, pickups = null, infoCards = null;
+      const addTo = (map, gname, item)=>{ if(!map[gname]) map[gname]={id:uid(), name:gname, items:[]}; if(item) map[gname].items.push(item); };
+
+      const wsS = sheetByName("Sprzęt");
+      if(wsS){ used.add(wsS);
+        const all = rowsOf(wsS); const hdr = all[0]||[];
+        const c = colMap(hdr, {mag:["magazyn"], co:["co","pozycja","nazwa"], osoba:["osoba","gdzie"], ilosc:["ilosc","ile","szt"], nota:["notatka","uwagi"], zal:["zaladunek"], roz:["rozladunek"]});
+        const ix = (k,d)=> c[k]>=0 ? c[k] : d;
+        const iM=ix("mag",0), iC=ix("co",1), iO=ix("osoba",2), iQ=ix("ilosc",3), iN=ix("nota",4), iZ=ix("zal",5), iR=ix("roz",6);
         const map = {};
-        rows.forEach(r=>{
-          if(!r||!r[0]) return;
-          const gname = String(r[0]).trim();
-          if(!map[gname]) map[gname] = {id:uid(), name:gname, items:[]};
-          if(r[1]) map[gname].items.push({id:uid(), co:String(r[1]||""), gdzie:String(r[2]||""), ilosc:(r[3]==null||r[3]==="")?1:Number(r[3])||1, notatka:String(r[4]||""), checked:isChecked(r[5]), checkedReturn:isChecked(r[6])});
+        all.slice(1).forEach(r=>{
+          const gname = String(r[iM]||"").trim(); if(!gname) return;
+          const co = String(r[iC]||"").trim();
+          addTo(map, gname, co ? {id:uid(), co, gdzie:String(r[iO]||""), ilosc:num(r[iQ]), notatka:String(r[iN]||""), checked:isChecked(r[iZ]), checkedReturn:isChecked(r[iR])} : null);
         });
         groups = Object.values(map);
       }
-      let pickups = [];
-      if(wb.Sheets["Odbiory"]){
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets["Odbiory"], {header:1}).slice(1);
+      const wsO = sheetByName("Odbiory");
+      if(wsO){ used.add(wsO);
+        const all = rowsOf(wsO); const hdr = all[0]||[];
+        const c = colMap(hdr, {lista:["lista"], text:["pozycja","co","nazwa"], ilosc:["ilosc","ile","szt"], nota:["notatka","uwagi"], chk:["zaznaczone","odebrane"]});
+        const ix = (k,d)=> c[k]>=0 ? c[k] : d;
+        const iL=ix("lista",0), iT=ix("text",1), iQ=ix("ilosc",2), iN=ix("nota",3), iK=ix("chk",4);
         const map = {};
-        rows.forEach(r=>{
-          if(!r||!r[0]) return;
-          const gname = String(r[0]).trim();
-          if(!map[gname]) map[gname] = {id:uid(), name:gname, items:[]};
-          if(r[1]) map[gname].items.push({id:uid(), text:String(r[1]||""), ilosc:(r[2]==null||r[2]==="")?1:Number(r[2])||1, notatka:String(r[3]||""), checked:isChecked(r[4])});
+        all.slice(1).forEach(r=>{
+          const gname = String(r[iL]||"").trim(); if(!gname) return;
+          const t = String(r[iT]||"").trim();
+          addTo(map, gname, t ? {id:uid(), text:t, ilosc:num(r[iQ]), notatka:String(r[iN]||""), checked:isChecked(r[iK])} : null);
         });
         pickups = Object.values(map);
       }
-      let infoCards = [];
-      if(wb.Sheets["Informacje"]){
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets["Informacje"], {header:1}).slice(1);
-        rows.forEach(r=>{ if(r&&r[0]) infoCards.push({id:uid(), title:String(r[0]||""), address:String(r[1]||""), body:String(r[2]||"")}); });
+      const wsI = sheetByName("Informacje");
+      if(wsI){ used.add(wsI);
+        infoCards = [];
+        rowsOf(wsI).slice(1).forEach(r=>{ if(String(r[0]||"").trim()) infoCards.push({id:uid(), title:String(r[0]), address:String(r[1]||""), body:String(r[2]||"")}); });
       }
-      ev.title = newTitle; ev.subtitle = newSub; ev.groups = groups; ev.pickups = pickups; ev.infoCards = infoCards;
-      saveState(); render();
-    }catch(err){ alert("Nie udało się wczytać pliku — sprawdź czy to poprawny plik wyeksportowany z tego narzędzia."); }
+      // Pozostałe arkusze (np. z "Eksport dla magazynu" albo własny Excel): każdy = magazyn, kolumny po nagłówkach
+      const extra = wb.SheetNames.filter(n=>!used.has(wb.Sheets[n]));
+      if(!wsS && extra.length){
+        const map = {};
+        extra.forEach(n=>{
+          const all = rowsOf(wb.Sheets[n]); if(!all.length) return;
+          let hi = all.findIndex(r=>r.some(h=>["co","pozycja","nazwa","przedmiot"].includes(norm(h))));
+          if(hi<0) hi = 0;
+          const hdr = all[hi];
+          const c = colMap(hdr, {co:["co","pozycja","nazwa","przedmiot"], osoba:["osoba","gdzie","odpowiedzialny"], ilosc:["ilosc","ile","szt"], nota:["notatka","uwagi"]});
+          const iC = c.co>=0?c.co:0, iO=c.osoba>=0?c.osoba:-1, iQ=c.ilosc>=0?c.ilosc:-1, iN=c.nota>=0?c.nota:-1;
+          addTo(map, n.trim(), null);
+          all.slice(hi+1).forEach(r=>{
+            const co = String(r[iC]||"").trim(); if(!co) return;
+            addTo(map, n.trim(), {id:uid(), co, gdzie:iO>=0?String(r[iO]||""):"", ilosc:iQ>=0?num(r[iQ]):1, notatka:iN>=0?String(r[iN]||""):"", checked:false, checkedReturn:false});
+          });
+        });
+        const g = Object.values(map).filter(x=>x.items.length);
+        if(g.length) groups = g;
+      }
+      if(groups===null && pickups===null && infoCards===null){
+        showNotice("Nie rozpoznano danych w pliku. Arkusze powinny mieć nazwy: Sprzęt, Odbiory, Informacje — albo kolumny Co / Ilość / Osoba / Notatka.");
+        return;
+      }
+      ev.title = newTitle; ev.subtitle = newSub;
+      if(groups!==null) ev.groups = groups;
+      if(pickups!==null) ev.pickups = pickups;
+      if(infoCards!==null) ev.infoCards = infoCards;
+      saveState("zaimportowano dane z Excela"); render();
+      const cnt = (groups||[]).reduce((a,g)=>a+g.items.length,0);
+      showNotice("Zaimportowano z Excela: "+cnt+" pozycji sprzętu"+(pickups?", "+pickups.length+" list odbioru":"")+(infoCards?", "+infoCards.length+" kart info":"")+".");
+    }catch(err){ console.error(err); showNotice("Nie udało się wczytać pliku Excel: "+(err&&err.message?err.message:"nieznany błąd")); }
   };
   reader.readAsArrayBuffer(file);
   e.target.value = "";
@@ -1215,6 +1259,5 @@ document.addEventListener("focusout", ()=>{
   ensureCloud(currentEvent());
 })();
 </script>
-<button type="button" id="editFloat" aria-label="Tryb edycji">✎ Edytuj</button>
 </body>
 </html>
