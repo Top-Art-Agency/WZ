@@ -160,6 +160,11 @@
     background:var(--green-deep,#0b3d2e);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;}
   body.edit-mode #editFloat{background:var(--lime,#b7e36a);color:var(--green-deep,#0b3d2e);}
   .tile-edit{border:1px solid var(--line,#ccc);background:transparent;color:inherit;border-radius:999px;padding:2px 9px;margin-left:8px;font:inherit;font-size:13px;cursor:pointer;}
+  .move-btns{display:flex;flex-direction:column;gap:2px;flex:none;}
+  .move-btns .mv{border:1px solid var(--line);background:transparent;color:inherit;border-radius:6px;width:30px;height:24px;font-size:12px;cursor:pointer;padding:0;line-height:1;}
+  .move-select{flex:1;min-width:0;}
+  .group-move{display:inline-flex;gap:3px;margin-right:6px;vertical-align:middle;}
+  .group-move .mv{border:1px solid var(--line);background:transparent;color:inherit;border-radius:6px;width:30px;height:26px;cursor:pointer;padding:0;}
   #syncNotice{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--paper);color:var(--ink);
     border:1px solid var(--line);border-left:4px solid var(--red);padding:12px 18px;border-radius:9px;
     box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:150;max-width:calc(100% - 32px);width:420px;font-size:13.5px;line-height:1.5;}
@@ -633,6 +638,7 @@ function renderGroups(){
 
     const right = document.createElement("span");
     if(editMode){
+      const gm = moveBtns(ev.groups, grp.id, grp.name, ()=>{ saveState("zmieniono kolejność magazynów"); render(); }); gm.className="group-move"; right.appendChild(gm);
       const rm = document.createElement("button"); rm.type="button"; rm.className = "remove-group"; rm.textContent = "Usuń magazyn";
       rm.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); ev.groups = ev.groups.filter(g=>g.id!==grp.id); saveState("usunięto magazyn: "+grp.name); render(); });
       right.appendChild(rm);
@@ -664,11 +670,15 @@ function renderGroups(){
         iloscInp.value = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc; iloscInp.placeholder = "Ilość";
         iloscInp.addEventListener("input", ()=>{ item.ilosc = iloscInp.value; saveState(); });
         line2.appendChild(gdzieInp); line2.appendChild(iloscInp);
+        const line3 = document.createElement("div"); line3.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
+        const lbl = document.createElement("span"); lbl.className="meta"; lbl.textContent="Magazyn:"; lbl.style.margin="0";
+        line3.appendChild(lbl); line3.appendChild(moveSelect(ev.groups, grp, item, "magazyn", "przeniesiono "+item.co));
 
         const noteInp = document.createElement("input"); noteInp.className = "field"; noteInp.value = item.notatka||""; noteInp.placeholder = "Notatka (opcjonalnie)";
         noteInp.addEventListener("input", ()=>{ item.notatka = noteInp.value; saveState(); });
         noteInp.addEventListener("blur", ()=>{ saveState("zmieniono notatkę przy: "+item.co); });
-        txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(noteInp);
+        txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(noteInp);
+        row.appendChild(moveBtns(grp.items, item.id, item.co, ()=>{ saveState("zmieniono kolejność: "+item.co); render(); }));
         row.appendChild(txt); row.appendChild(del);
       } else {
         const box = document.createElement("input"); box.type = "checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
@@ -730,6 +740,7 @@ function renderPickups(){
     left.appendChild(count); summary.appendChild(left);
     const right = document.createElement("span");
     if(editMode){
+      const gm = moveBtns(ev.pickups, grp.id, grp.name, ()=>{ saveState("zmieniono kolejność list"); render(); }); gm.className="group-move"; right.appendChild(gm);
       const rm = document.createElement("button"); rm.type="button"; rm.className="remove-group"; rm.textContent="Usuń listę";
       rm.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); ev.pickups = ev.pickups.filter(g=>g.id!==grp.id); saveState("usunięto listę odbioru: "+grp.name); render(); });
       right.appendChild(rm);
@@ -753,7 +764,11 @@ function renderPickups(){
         noteInp.addEventListener("input", ()=>{ item.notatka = noteInp.value; saveState(); });
         noteInp.addEventListener("blur", ()=>{ saveState("zmieniono notatkę przy: "+item.text); });
         line2.appendChild(iloscInp);
-        txt.appendChild(textInp); txt.appendChild(line2); txt.appendChild(noteInp);
+        const line3 = document.createElement("div"); line3.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
+        const lbl = document.createElement("span"); lbl.className="meta"; lbl.textContent="Lista:"; lbl.style.margin="0";
+        line3.appendChild(lbl); line3.appendChild(moveSelect(ev.pickups, grp, item, "lista", "przeniesiono "+item.text));
+        txt.appendChild(textInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(noteInp);
+        row.appendChild(moveBtns(grp.items, item.id, item.text, ()=>{ saveState("zmieniono kolejność: "+item.text); render(); }));
         row.appendChild(txt); row.appendChild(del);
       } else {
         const box = document.createElement("input"); box.type="checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
@@ -825,6 +840,27 @@ function renderInfoCards(){
 // ---------------- event handlers: header controls ----------------
 document.getElementById("editToggle").addEventListener("click", ()=>{ editMode = !editMode; render(); });
 document.getElementById("editFloat").addEventListener("click", ()=>{ editMode = !editMode; render(); });
+
+function moveBy(arr, id, d){ const i = arr.findIndex(x=>x.id===id), j = i+d; if(i<0||j<0||j>=arr.length) return false; const t=arr[i]; arr[i]=arr[j]; arr[j]=t; return true; }
+function moveBtns(arr, id, label, onDone){
+  const box = document.createElement("div"); box.className = "move-btns";
+  [["▲",-1,"Przesuń w górę"],["▼",1,"Przesuń w dół"]].forEach(([ch,d,t])=>{
+    const b = document.createElement("button"); b.type="button"; b.className="mv"; b.textContent=ch; b.title=t; b.setAttribute("aria-label", t+": "+label);
+    b.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); if(moveBy(arr,id,d)){ onDone(); } });
+    box.appendChild(b);
+  });
+  return box;
+}
+function moveSelect(lists, fromList, item, label, histTxt){
+  const sel = document.createElement("select"); sel.className = "field move-select"; sel.title = "Przenieś do innej listy";
+  lists.forEach(l=>{ const o=document.createElement("option"); o.value=l.id; o.textContent=l.name||"(bez nazwy)"; if(l.id===fromList.id) o.selected=true; sel.appendChild(o); });
+  sel.addEventListener("change", ()=>{
+    const to = lists.find(l=>l.id===sel.value); if(!to||to.id===fromList.id) return;
+    fromList.items = fromList.items.filter(it=>it.id!==item.id); to.items.push(item);
+    saveState(histTxt+" → "+to.name); render();
+  });
+  return sel;
+}
 function tileEditBtn(){ const b=document.createElement("button"); b.type="button"; b.className="tile-edit"; b.textContent="✎"; b.title="Edytuj"; b.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); editMode=true; render(); }); return b; }
 document.getElementById("titleInput").addEventListener("input", e=>{ currentEvent().title = e.target.value; saveState(); document.getElementById("titleText").textContent = e.target.value; populateEventSelect(); });
 document.getElementById("titleInput").addEventListener("blur", ()=>{ saveState("zmieniono nazwę eventu: "+currentEvent().title); });
