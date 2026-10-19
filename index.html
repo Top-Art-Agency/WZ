@@ -165,6 +165,12 @@
   .move-select{flex:1;min-width:0;}
   .group-move{display:inline-flex;gap:3px;margin-right:6px;vertical-align:middle;}
   .group-move .mv{border:1px solid var(--line);background:transparent;color:inherit;border-radius:6px;width:30px;height:26px;cursor:pointer;padding:0;}
+  .status-badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:3px;color:#fff;}
+  .status-select{flex:1;min-width:0;}
+  .status-editor{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:12px;}
+  .status-editor h3{margin:0 0 6px;font-size:14px;}
+  .status-row{display:flex;gap:6px;margin-bottom:6px;align-items:center;}
+  .status-row .dot{width:14px;height:14px;border-radius:50%;flex:none;}
   #syncNotice{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--paper);color:var(--ink);
     border:1px solid var(--line);border-left:4px solid var(--red);padding:12px 18px;border-radius:9px;
     box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:150;max-width:calc(100% - 32px);width:420px;font-size:13.5px;line-height:1.5;}
@@ -279,6 +285,7 @@
     <select class="field" id="personFilter" style="margin:0 0 .8rem;"></select>
     <div id="equipmentGroups"></div>
     <div class="edit-only"><button class="btn" id="addGroupBtn">+ Dodaj magazyn</button></div>
+    <div class="edit-only status-editor" id="statusEditor"></div>
   </section>
 
   <div class="secondary-column">
@@ -369,6 +376,8 @@ function normalizeEvent(ev){
   const list = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v==="object" ? Object.values(v).filter(Boolean) : []);
   ev.groups = list(ev.groups); ev.pickups = list(ev.pickups); ev.infoCards = list(ev.infoCards); ev.history = list(ev.history);
   [...ev.groups, ...ev.pickups].forEach(g=>{ g.items = list(g.items); });
+  ev.statuses = list(ev.statuses);
+  if(!ev.statusesInit){ ev.statusesInit = true; if(!ev.statuses.length) ev.statuses = [{id:"st1",name:"Zamówione/kupione"},{id:"st2",name:"Na miejscu"},{id:"st3",name:"W dostawie"}]; }
   return ev;
 }
 function keepGroupOpen(det, key){
@@ -610,6 +619,7 @@ function equipmentEmpty(){
 }
 
 function renderGroups(){
+  renderStatusEditor();
   const wrap = document.getElementById("equipmentGroups");
   wrap.innerHTML = "";
   const ev = currentEvent();
@@ -673,11 +683,14 @@ function renderGroups(){
         const line3 = document.createElement("div"); line3.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
         const lbl = document.createElement("span"); lbl.className="meta"; lbl.textContent="Magazyn:"; lbl.style.margin="0";
         line3.appendChild(lbl); line3.appendChild(moveSelect(ev.groups, grp, item, "magazyn", "przeniesiono "+item.co));
+        const line4 = document.createElement("div"); line4.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
+        const lbl4 = document.createElement("span"); lbl4.className="meta"; lbl4.textContent="Status:"; lbl4.style.margin="0";
+        line4.appendChild(lbl4); line4.appendChild(statusSelect(ev, item));
 
         const noteInp = document.createElement("input"); noteInp.className = "field"; noteInp.value = item.notatka||""; noteInp.placeholder = "Notatka (opcjonalnie)";
         noteInp.addEventListener("input", ()=>{ item.notatka = noteInp.value; saveState(); });
         noteInp.addEventListener("blur", ()=>{ saveState("zmieniono notatkę przy: "+item.co); });
-        txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(noteInp);
+        txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(line4); txt.appendChild(noteInp);
         row.appendChild(moveBtns(grp.items, item.id, item.co, ()=>{ saveState("zmieniono kolejność: "+item.co); render(); }));
         row.appendChild(txt); row.appendChild(del);
       } else {
@@ -689,6 +702,7 @@ function renderGroups(){
         const qty = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc;
         let html = '<span class="co">'+escapeHtml(item.co)+(Number(qty)!==1 ? '<span class="qty-badge">×'+escapeHtml(String(qty))+'</span>' : '')+'</span>';
         if(item.gdzie) html += '<span class="meta">'+escapeHtml(item.gdzie)+(unclear?' · do ustalenia':'')+'</span>';
+        html += statusBadgeHtml(ev, item);
         if(item.notatka) html += '<span class="note">📝 '+escapeHtml(item.notatka)+'</span>';
         txt.innerHTML = html;
         row.appendChild(box); row.appendChild(txt);
@@ -767,7 +781,10 @@ function renderPickups(){
         const line3 = document.createElement("div"); line3.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
         const lbl = document.createElement("span"); lbl.className="meta"; lbl.textContent="Lista:"; lbl.style.margin="0";
         line3.appendChild(lbl); line3.appendChild(moveSelect(ev.pickups, grp, item, "lista", "przeniesiono "+item.text));
-        txt.appendChild(textInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(noteInp);
+        const line4 = document.createElement("div"); line4.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
+        const lbl4 = document.createElement("span"); lbl4.className="meta"; lbl4.textContent="Status:"; lbl4.style.margin="0";
+        line4.appendChild(lbl4); line4.appendChild(statusSelect(ev, item));
+        txt.appendChild(textInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(line4); txt.appendChild(noteInp);
         row.appendChild(moveBtns(grp.items, item.id, item.text, ()=>{ saveState("zmieniono kolejność: "+item.text); render(); }));
         row.appendChild(txt); row.appendChild(del);
       } else {
@@ -778,6 +795,7 @@ function renderPickups(){
         const txt = document.createElement("div"); txt.className="txt";
         const qty = (item.ilosc===undefined||item.ilosc===null||item.ilosc==="")?1:item.ilosc;
         let html = '<span class="co">'+escapeHtml(item.text)+(Number(qty)!==1 ? '<span class="qty-badge">×'+escapeHtml(String(qty))+'</span>' : '')+'</span>';
+        html += statusBadgeHtml(ev, item);
         if(item.notatka) html += '<span class="note">📝 '+escapeHtml(item.notatka)+'</span>';
         txt.innerHTML = html;
         row.appendChild(box); row.appendChild(txt);
@@ -860,6 +878,40 @@ function moveSelect(lists, fromList, item, label, histTxt){
     saveState(histTxt+" → "+to.name); render();
   });
   return sel;
+}
+
+const STATUS_COLORS = ["#d97706","#15803d","#2563eb","#7c3aed","#be185d","#0f766e"];
+function statusColor(ev, id){ const i = ev.statuses.findIndex(x=>x.id===id); return STATUS_COLORS[(i<0?0:i)%STATUS_COLORS.length]; }
+function statusOf(ev, item){ return item.status ? ev.statuses.find(x=>x.id===item.status) : null; }
+function statusSelect(ev, item){
+  const sel = document.createElement("select"); sel.className="field status-select"; sel.title="Status";
+  const o0 = document.createElement("option"); o0.value=""; o0.textContent="— brak statusu —"; sel.appendChild(o0);
+  ev.statuses.forEach(st=>{ const o=document.createElement("option"); o.value=st.id; o.textContent=st.name||"(bez nazwy)"; if(item.status===st.id) o.selected=true; sel.appendChild(o); });
+  sel.addEventListener("change", ()=>{ item.status = sel.value; const st=statusOf(ev,item); saveState("status: "+(item.co||item.text)+" → "+(st?st.name:"brak")); });
+  return sel;
+}
+function statusBadgeHtml(ev, item){ const st = statusOf(ev,item); return st ? '<span class="status-badge" style="background:'+statusColor(ev,st.id)+'">'+escapeHtml(st.name)+'</span>' : ''; }
+function renderStatusEditor(){
+  const box = document.getElementById("statusEditor"); box.innerHTML = "";
+  const ev = currentEvent();
+  const h = document.createElement("h3"); h.textContent = "Statusy pozycji (możesz zmienić nazwy)"; box.appendChild(h);
+  ev.statuses.forEach(st=>{
+    const row = document.createElement("div"); row.className="status-row";
+    const dot = document.createElement("span"); dot.className="dot"; dot.style.background = statusColor(ev, st.id);
+    const inp = document.createElement("input"); inp.className="field"; inp.value = st.name; inp.placeholder="Nazwa statusu";
+    inp.addEventListener("input", ()=>{ st.name = inp.value; saveState(); });
+    inp.addEventListener("blur", ()=>{ saveState("zmieniono nazwę statusu: "+st.name); });
+    const del = document.createElement("button"); del.type="button"; del.className="btn"; del.textContent="✕"; del.title="Usuń status";
+    del.addEventListener("click", ()=>{
+      ev.statuses = ev.statuses.filter(x=>x.id!==st.id);
+      [...ev.groups, ...ev.pickups].forEach(g=>g.items.forEach(it=>{ if(it.status===st.id) it.status=""; }));
+      saveState("usunięto status: "+st.name); render();
+    });
+    row.appendChild(dot); row.appendChild(inp); row.appendChild(del); box.appendChild(row);
+  });
+  const add = document.createElement("button"); add.type="button"; add.className="btn"; add.textContent="+ Dodaj status";
+  add.addEventListener("click", ()=>{ ev.statuses.push({id:uid(), name:"Nowy status"}); saveState("dodano status"); render(); });
+  box.appendChild(add);
 }
 function tileEditBtn(){ const b=document.createElement("button"); b.type="button"; b.className="tile-edit"; b.textContent="✎"; b.title="Edytuj"; b.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); editMode=true; render(); }); return b; }
 document.getElementById("titleInput").addEventListener("input", e=>{ currentEvent().title = e.target.value; saveState(); document.getElementById("titleText").textContent = e.target.value; populateEventSelect(); });
@@ -946,13 +998,13 @@ document.getElementById("exportBtn").addEventListener("click", ()=>{
   wsSettings["!cols"] = [{wch:14},{wch:40}];
   XLSX.utils.book_append_sheet(wb, wsSettings, "Ustawienia");
 
-  const sprzetRows = [["Magazyn","Co","Osoba","Ilość","Notatka","Zaladunek","Rozladunek"]];
+  const sprzetRows = [["Magazyn","Co","Osoba","Ilość","Notatka","Zaladunek","Rozladunek","Status"]];
   ev.groups.forEach(g=>{
-    g.items.forEach(it=>{ sprzetRows.push([g.name, it.co, it.gdzie||"", (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.notatka||"", it.checked?"tak":"nie", it.checkedReturn?"tak":"nie"]); });
+    g.items.forEach(it=>{ sprzetRows.push([g.name, it.co, it.gdzie||"", (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.notatka||"", it.checked?"tak":"nie", it.checkedReturn?"tak":"nie", (statusOf(ev,it)||{}).name||""]); });
     if(g.items.length===0) sprzetRows.push([g.name,"","","","","",""]);
   });
   const wsSprzet = XLSX.utils.aoa_to_sheet(sprzetRows);
-  wsSprzet["!cols"] = [{wch:18},{wch:36},{wch:20},{wch:8},{wch:26},{wch:10},{wch:10}];
+  wsSprzet["!cols"] = [{wch:18},{wch:36},{wch:20},{wch:8},{wch:26},{wch:10},{wch:10},{wch:18}];
   XLSX.utils.book_append_sheet(wb, wsSprzet, "Sprzęt");
 
   const odbioryRows = [["Lista","Pozycja","Ilość","Notatka","Zaznaczone"]];
@@ -989,6 +1041,8 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
       const colMap = (hdr, spec) => { const out={}; Object.keys(spec).forEach((k,i)=>{ const idx = hdr.findIndex(h=>spec[k].includes(norm(h))); out[k]=idx; }); return out; };
       const ev = currentEvent();
       const used = new Set();
+      const newStatuses = ev.statuses.map(x=>({...x}));
+      const statusIdByName = v => { const n=String(v==null?"":v).trim(); if(!n) return ""; let st=newStatuses.find(x=>norm(x.name)===norm(n)); if(!st){ st={id:uid(), name:n}; newStatuses.push(st); } return st.id; };
       let newTitle = ev.title, newSub = ev.subtitle;
       const wsSet = sheetByName("Ustawienia");
       if(wsSet){ used.add(wsSet);
@@ -1003,14 +1057,14 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
       const wsS = sheetByName("Sprzęt");
       if(wsS){ used.add(wsS);
         const all = rowsOf(wsS); const hdr = all[0]||[];
-        const c = colMap(hdr, {mag:["magazyn"], co:["co","pozycja","nazwa"], osoba:["osoba","gdzie"], ilosc:["ilosc","ile","szt"], nota:["notatka","uwagi"], zal:["zaladunek"], roz:["rozladunek"]});
+        const c = colMap(hdr, {mag:["magazyn"], co:["co","pozycja","nazwa"], osoba:["osoba","gdzie"], ilosc:["ilosc","ile","szt"], nota:["notatka","uwagi"], zal:["zaladunek"], roz:["rozladunek"], st:["status"]});
         const ix = (k,d)=> c[k]>=0 ? c[k] : d;
-        const iM=ix("mag",0), iC=ix("co",1), iO=ix("osoba",2), iQ=ix("ilosc",3), iN=ix("nota",4), iZ=ix("zal",5), iR=ix("roz",6);
+        const iM=ix("mag",0), iC=ix("co",1), iO=ix("osoba",2), iQ=ix("ilosc",3), iN=ix("nota",4), iZ=ix("zal",5), iR=ix("roz",6), iS=ix("st",7);
         const map = {};
         all.slice(1).forEach(r=>{
           const gname = String(r[iM]||"").trim(); if(!gname) return;
           const co = String(r[iC]||"").trim();
-          addTo(map, gname, co ? {id:uid(), co, gdzie:String(r[iO]||""), ilosc:num(r[iQ]), notatka:String(r[iN]||""), checked:isChecked(r[iZ]), checkedReturn:isChecked(r[iR])} : null);
+          addTo(map, gname, co ? {id:uid(), co, gdzie:String(r[iO]||""), ilosc:num(r[iQ]), notatka:String(r[iN]||""), checked:isChecked(r[iZ]), checkedReturn:isChecked(r[iR]), status:statusIdByName(r[iS])} : null);
         });
         groups = Object.values(map);
       }
@@ -1057,7 +1111,7 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
         showNotice("Nie rozpoznano danych w pliku. Arkusze powinny mieć nazwy: Sprzęt, Odbiory, Informacje — albo kolumny Co / Ilość / Osoba / Notatka.");
         return;
       }
-      ev.title = newTitle; ev.subtitle = newSub;
+      ev.title = newTitle; ev.subtitle = newSub; ev.statuses = newStatuses;
       if(groups!==null) ev.groups = groups;
       if(pickups!==null) ev.pickups = pickups;
       if(infoCards!==null) ev.infoCards = infoCards;
@@ -1075,10 +1129,10 @@ document.getElementById("warehouseBtn").addEventListener("click", ()=>{
   const ev = currentEvent();
   const wb = XLSX.utils.book_new();
   ev.groups.forEach(g=>{
-    const rows = [["Co","Ilość","Osoba","Notatka"]];
-    g.items.forEach(it=>{ rows.push([it.co, (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.gdzie||"", it.notatka||""]); });
+    const rows = [["Co","Ilość","Osoba","Notatka","Status"]];
+    g.items.forEach(it=>{ rows.push([it.co, (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.gdzie||"", it.notatka||"", (statusOf(ev,it)||{}).name||""]); });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{wch:38},{wch:8},{wch:20},{wch:30}];
+    ws["!cols"] = [{wch:38},{wch:8},{wch:20},{wch:30},{wch:18}];
     const safeName = (g.name||"Magazyn").replace(/[\\\/\?\*\[\]:]/g,"_").slice(0,31) || "Magazyn";
     XLSX.utils.book_append_sheet(wb, ws, safeName);
   });
