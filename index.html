@@ -179,6 +179,9 @@
   .stay-check{display:flex;align-items:center;gap:6px;flex-basis:100%;font-size:13px;color:var(--ink);cursor:pointer;}
   .stay-check input{width:18px;height:18px;margin:0;}
   .stay-info{font-size:12.5px;color:var(--amber-deep);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:0 0 .7rem;}
+  .prod-meta-late{color:var(--red);font-weight:700;}
+  .prod-link{display:inline-block;font-size:12.5px;font-weight:700;margin-top:3px;text-decoration:none;border-bottom:2px solid var(--lime);}
+  .prod-badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:3px;color:#fff;}
   .status-badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:3px;color:#fff;}
   .status-select{flex:1;min-width:0;}
   .status-editor{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:12px;}
@@ -273,6 +276,7 @@
   <nav class="chips">
     <a href="#sprzet">Sprzęt</a>
     <a href="#odbiory">Odbiory</a>
+    <a href="#produkcja">Produkcja</a>
     <a href="#info">Info</a>
     <button type="button" class="chip-btn" id="shareBtn"><span aria-hidden="true">🔗</span><span>Udostępnij</span></button>
     <button type="button" class="chip-btn" id="historyBtn"><span aria-hidden="true">🕘</span><span>Historia</span></button>
@@ -309,6 +313,13 @@
     <p class="section-sub">Osobne listy rzeczy do odebrania z różnych miejsc.</p>
     <div id="pickupGroups"></div>
     <div class="edit-only"><button class="btn" id="addPickupBtn">+ Dodaj listę odbioru</button></div>
+  </section>
+
+  <section id="produkcja">
+    <h2 class="section-title">Produkcja / multimedia</h2>
+    <p class="section-sub">Animacje, grafiki, filmy, prezentacje — rzeczy do przygotowania, nie do przewiezienia.</p>
+    <div id="productionGroups"></div>
+    <div class="edit-only"><button class="btn" id="addProductionBtn">+ Dodaj listę produkcji</button></div>
   </section>
 
   <section id="info">
@@ -390,8 +401,8 @@ function showNotice(message){
 function normalizeEvent(ev){
   if(!ev) return ev;
   const list = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v==="object" ? Object.values(v).filter(Boolean) : []);
-  ev.groups = list(ev.groups); ev.pickups = list(ev.pickups); ev.infoCards = list(ev.infoCards); ev.history = list(ev.history);
-  [...ev.groups, ...ev.pickups].forEach(g=>{ g.items = list(g.items); });
+  ev.groups = list(ev.groups); ev.pickups = list(ev.pickups); ev.production = list(ev.production); ev.infoCards = list(ev.infoCards); ev.history = list(ev.history);
+  [...ev.groups, ...ev.pickups, ...ev.production].forEach(g=>{ g.items = list(g.items); });
   ev.statuses = list(ev.statuses);
   if(!ev.statusesInit){ ev.statusesInit = true; if(!ev.statuses.length) ev.statuses = [{id:"st1",name:"Zamówione/kupione"},{id:"st2",name:"Na miejscu"},{id:"st3",name:"W dostawie"}]; }
   return ev;
@@ -410,7 +421,7 @@ function blankEvent(title, forcedId){
   return {
     id: forcedId || uid(), title: title || "Nowy event", subtitle: "",
     cloudId: null,
-    groups: [], pickups: [], infoCards: [],
+    groups: [], pickups: [], production: [], infoCards: [],
   };
 }
 
@@ -603,6 +614,7 @@ function render(){
   renderGroups();
   equipmentEmpty();
   renderPickups();
+  renderProduction();
   renderInfoCards();
   updateProgress();
 }
@@ -863,6 +875,132 @@ function renderPickups(){
   });
 }
 
+const PROD_STAGES = [
+  {id:"todo", name:"Do zrobienia", color:"#6b7280"},
+  {id:"wip", name:"W trakcie", color:"#2563eb"},
+  {id:"review", name:"Do akceptacji", color:"#d97706"},
+  {id:"done", name:"Gotowe", color:"#15803d"},
+];
+function prodStage(item){ return PROD_STAGES.find(s=>s.id===item.etap) || PROD_STAGES[0]; }
+function stageIdByName(v){ const n=String(v==null?"":v).trim().toLowerCase(); const st = PROD_STAGES.find(s=>s.name.toLowerCase()===n || s.id===n); return st ? st.id : "todo"; }
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function fmtDate(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s||"") ? s.slice(8,10)+"."+s.slice(5,7) : (s||""); }
+function safeUrl(u){ u=(u||"").trim(); if(!u) return ""; if(!/^https?:\/\//i.test(u)) u = "https://"+u; return u; }
+function renderProduction(){
+  const wrap = document.getElementById("productionGroups");
+  wrap.innerHTML = "";
+  const ev = currentEvent();
+  if(!ev.production.length && !editMode){
+    wrap.innerHTML = '<div class="empty-panel"><strong>Brak produkcji</strong>Włącz edycję, aby dodać listę (np. „Animacje”, „Grafiki”).</div>';
+    return;
+  }
+  ev.production.forEach(grp=>{
+    const det = document.createElement("details"); det.className = "group"; keepGroupOpen(det, ev.id+"/produkcja/"+grp.id);
+    const summary = document.createElement("summary"); summary.className = "group-head";
+    const left = document.createElement("span"); left.className="group-head-left";
+    if(editMode){
+      const inp = document.createElement("input"); inp.className = "group-edit-name field"; inp.value = grp.name; inp.style.marginRight="6px";
+      inp.addEventListener("click", e=>e.stopPropagation());
+      inp.addEventListener("input", ()=>{ grp.name = inp.value; saveState(); });
+      inp.addEventListener("blur", ()=>{ saveState("zmieniono nazwę listy produkcji: "+grp.name); });
+      left.appendChild(inp);
+    } else { left.textContent = grp.name; }
+    const done = grp.items.filter(it=>it.etap==="done").length;
+    const count = document.createElement("span"); count.className="group-count"; count.textContent = done+"/"+grp.items.length;
+    left.appendChild(count); summary.appendChild(left);
+    const right = document.createElement("span");
+    if(editMode){
+      const gm = moveBtns(ev.production, grp.id, grp.name, ()=>{ saveState("zmieniono kolejność list produkcji"); render(); }); gm.className="group-move"; right.appendChild(gm);
+      const rm = document.createElement("button"); rm.type="button"; rm.className="remove-group"; rm.textContent="Usuń listę";
+      rm.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); ev.production = ev.production.filter(g=>g.id!==grp.id); saveState("usunięto listę produkcji: "+grp.name); render(); });
+      right.appendChild(rm);
+    } else { if(!isReadOnly) right.appendChild(tileEditBtn()); const chev=document.createElement("span"); chev.className="chev"; chev.textContent="›"; right.appendChild(chev); }
+    summary.appendChild(right); det.appendChild(summary);
+
+    const list = document.createElement("div"); list.className = "items"; list.dataset.gid = grp.id; det.appendChild(list);
+    grp.items.forEach(item=>{
+      const isDone = item.etap==="done";
+      const row = document.createElement("div"); row.dataset.id = item.id; row.className = "item-row" + (isDone ? " checked" : "");
+      if(editMode){
+        const del = document.createElement("button"); del.type="button"; del.className="del"; del.textContent="✕"; del.style.display="inline-block";
+        del.addEventListener("click", ()=>{ grp.items = grp.items.filter(it=>it.id!==item.id); saveState("usunięto z produkcji: "+item.co); render(); });
+        const txt = document.createElement("div"); txt.className="txt";
+        const coInp = document.createElement("input"); coInp.className="field"; coInp.value = item.co||""; coInp.placeholder="Co (np. animacja otwierająca)";
+        coInp.addEventListener("input", ()=>{ item.co = coInp.value; saveState(); });
+        coInp.addEventListener("blur", ()=>{ saveState("zmieniono nazwę: "+item.co); });
+        const line2 = document.createElement("div"); line2.style.cssText="display:flex;gap:6px;";
+        const ktoInp = document.createElement("input"); ktoInp.className="field"; ktoInp.value = item.kto||""; ktoInp.placeholder="Kto robi";
+        ktoInp.addEventListener("input", ()=>{ item.kto = ktoInp.value; saveState(); });
+        ktoInp.addEventListener("blur", ()=>{ saveState("zmieniono wykonawcę: "+item.co+(item.kto?" → "+item.kto:"")); });
+        const terminInp = document.createElement("input"); terminInp.className="field"; terminInp.type="date"; terminInp.value = item.termin||""; terminInp.title="Termin"; terminInp.style.maxWidth="160px";
+        terminInp.addEventListener("change", ()=>{ item.termin = terminInp.value; saveState("termin: "+item.co+" → "+(fmtDate(item.termin)||"brak")); });
+        line2.appendChild(ktoInp); line2.appendChild(terminInp);
+        const line3 = document.createElement("div"); line3.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
+        const lbl3 = document.createElement("span"); lbl3.className="meta"; lbl3.textContent="Etap:"; lbl3.style.margin="0";
+        const stSel = document.createElement("select"); stSel.className="field status-select";
+        PROD_STAGES.forEach(st=>{ const o=document.createElement("option"); o.value=st.id; o.textContent=st.name; if(prodStage(item).id===st.id) o.selected=true; stSel.appendChild(o); });
+        stSel.addEventListener("change", ()=>{ item.etap = stSel.value; saveState("etap: "+item.co+" → "+prodStage(item).name); });
+        line3.appendChild(lbl3); line3.appendChild(stSel);
+        const line4 = document.createElement("div"); line4.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
+        const lbl4 = document.createElement("span"); lbl4.className="meta"; lbl4.textContent="Lista:"; lbl4.style.margin="0";
+        line4.appendChild(lbl4); line4.appendChild(moveSelect(ev.production, grp, item, "lista", "przeniesiono "+item.co));
+        const linkInp = document.createElement("input"); linkInp.className="field"; linkInp.value = item.link||""; linkInp.placeholder="Link do pliku (Drive, WeTransfer…)";
+        linkInp.addEventListener("input", ()=>{ item.link = linkInp.value; saveState(); });
+        linkInp.addEventListener("blur", ()=>{ saveState("zmieniono link przy: "+item.co); });
+        const noteInp = document.createElement("input"); noteInp.className="field"; noteInp.value = item.notatka||""; noteInp.placeholder="Notatka (opcjonalnie)";
+        noteInp.addEventListener("input", ()=>{ item.notatka = noteInp.value; saveState(); });
+        noteInp.addEventListener("blur", ()=>{ saveState("zmieniono notatkę przy: "+item.co); });
+        txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(line4); txt.appendChild(linkInp); txt.appendChild(noteInp);
+        row.appendChild(dragHandle(item.co)); row.appendChild(txt); row.appendChild(del);
+      } else {
+        const box = document.createElement("input"); box.type="checkbox"; box.disabled = isReadOnly; box.checked = isDone;
+        box.setAttribute("aria-label", "Gotowe: " + item.co);
+        box.addEventListener("change", ()=>{ item.etap = box.checked ? "done" : "wip"; saveState((box.checked?"gotowe: ":"cofnięto gotowe: ")+item.co); render(); });
+        const txt = document.createElement("div"); txt.className="txt";
+        let html = '<span class="co">'+escapeHtml(item.co)+'</span>';
+        const metaParts = [];
+        if(item.kto) metaParts.push(escapeHtml(item.kto));
+        if(item.termin){
+          const late = !isDone && item.termin < todayStr();
+          metaParts.push(late ? '<span class="prod-meta-late">termin '+fmtDate(item.termin)+' — po terminie</span>' : 'termin '+fmtDate(item.termin));
+        }
+        if(metaParts.length) html += '<span class="meta">'+metaParts.join(" · ")+'</span>';
+        if(!isDone){ const st = prodStage(item); html += '<span class="prod-badge" style="background:'+st.color+'">'+st.name+'</span>'; }
+        if(item.notatka) html += '<span class="note">📝 '+escapeHtml(item.notatka)+'</span>';
+        txt.innerHTML = html;
+        const url = safeUrl(item.link);
+        if(url){ const a = document.createElement("a"); a.className="prod-link"; a.href=url; a.target="_blank"; a.rel="noopener"; a.textContent="Otwórz plik ↗"; const br=document.createElement("br"); txt.appendChild(br); txt.appendChild(a); }
+        row.appendChild(box); row.appendChild(txt);
+      }
+      list.appendChild(row);
+    });
+    if(editMode) makeSortable(list, "production", ()=>currentEvent().production);
+
+    if(editMode){
+      const addLabel = document.createElement("p"); addLabel.className = "add-label"; addLabel.textContent = "Nowa pozycja";
+      det.appendChild(addLabel);
+      const addRow = document.createElement("div"); addRow.className="add-row"; addRow.style.padding="0 .9rem .4rem";
+      const coI = document.createElement("input"); coI.className="field"; coI.placeholder="Co (wymagane)";
+      const ktoI = document.createElement("input"); ktoI.className="field"; ktoI.placeholder="Kto robi";
+      const terminI = document.createElement("input"); terminI.className="field"; terminI.type="date"; terminI.title="Termin"; terminI.style.maxWidth="160px";
+      const linkI = document.createElement("input"); linkI.className="field"; linkI.placeholder="Link (opcjonalnie)"; linkI.style.flexBasis="100%";
+      const notatkaI = document.createElement("input"); notatkaI.className="field"; notatkaI.placeholder="Notatka (opcjonalnie)"; notatkaI.style.flexBasis="100%";
+      const addBtn = document.createElement("button"); addBtn.type="button"; addBtn.className="btn primary"; addBtn.textContent="Dodaj";
+      [coI, ktoI, terminI, linkI, notatkaI, addBtn].forEach(x=>addRow.appendChild(x));
+      det.appendChild(addRow);
+      const errMsg = document.createElement("p"); errMsg.className = "add-error-msg"; errMsg.textContent = "Wpisz, co trzeba przygotować, zanim dodasz.";
+      det.appendChild(errMsg);
+      addBtn.addEventListener("click", ()=>{
+        if(!coI.value.trim()){ coI.classList.add("error"); errMsg.classList.add("show"); coI.focus(); return; }
+        grp.items.push({id:uid(), co:coI.value.trim(), kto:ktoI.value.trim(), termin:terminI.value, link:linkI.value.trim(), notatka:notatkaI.value.trim(), etap:"todo"});
+        saveState("dodano do produkcji: "+coI.value.trim()); render();
+      });
+      coI.addEventListener("input", ()=>{ coI.classList.remove("error"); errMsg.classList.remove("show"); });
+    }
+    wrap.appendChild(det);
+  });
+}
+
 function renderInfoCards(){
   const wrap = document.getElementById("infoCards");
   wrap.innerHTML = "";
@@ -1035,6 +1173,7 @@ document.getElementById("duplicateEventBtn").addEventListener("click", ()=>{
   clone.lastEdit = null;
   clone.groups.forEach(g=>{ g.id = uid(); g.items.forEach(it=>{ it.id = uid(); it.checked = false; it.checkedReturn = false; }); });
   clone.pickups.forEach(g=>{ g.id = uid(); g.items.forEach(it=>{ it.id = uid(); it.checked = false; }); });
+  (clone.production||[]).forEach(g=>{ g.id = uid(); g.items.forEach(it=>{ it.id = uid(); it.etap = "todo"; }); });
   clone.infoCards.forEach(c=>{ c.id = uid(); });
   state.events[clone.id] = clone; state.currentId = clone.id;
   saveLocalOnly(); render(); updateAddressBar();
@@ -1056,12 +1195,13 @@ document.getElementById("deleteEventBtn").addEventListener("click", ()=>{
 
 document.getElementById("addGroupBtn").addEventListener("click", ()=>{ currentEvent().groups.push({id:uid(), name:"Nowy magazyn", items:[]}); saveState("dodano magazyn"); render(); });
 document.getElementById("addPickupBtn").addEventListener("click", ()=>{ currentEvent().pickups.push({id:uid(), name:"Nowa lista odbioru", items:[]}); saveState("dodano listę odbioru"); render(); });
+document.getElementById("addProductionBtn").addEventListener("click", ()=>{ currentEvent().production.push({id:uid(), name:"Animacje", items:[]}); saveState("dodano listę produkcji"); render(); });
 document.getElementById("addInfoBtn").addEventListener("click", ()=>{ currentEvent().infoCards.push({id:uid(), title:"Nowa karta", address:"", body:""}); saveState("dodano kartę informacyjną"); render(); });
 
 document.getElementById("resetBtn").addEventListener("click", ()=>{
   if(!confirm("Wyczyścić dane TEGO eventu i zacząć od zera?")) return;
   const ev = currentEvent();
-  ev.groups = []; ev.pickups = []; ev.infoCards = [];
+  ev.groups = []; ev.pickups = []; ev.production = []; ev.infoCards = [];
   saveState(); render();
 });
 
@@ -1090,6 +1230,15 @@ document.getElementById("exportBtn").addEventListener("click", ()=>{
   const wsOdbiory = XLSX.utils.aoa_to_sheet(odbioryRows);
   wsOdbiory["!cols"] = [{wch:22},{wch:36},{wch:8},{wch:26},{wch:12}];
   XLSX.utils.book_append_sheet(wb, wsOdbiory, "Odbiory");
+
+  const prodRows = [["Lista","Co","Kto","Termin","Etap","Link","Notatka"]];
+  ev.production.forEach(g=>{
+    g.items.forEach(it=>{ prodRows.push([g.name, it.co, it.kto||"", it.termin||"", prodStage(it).name, it.link||"", it.notatka||""]); });
+    if(g.items.length===0) prodRows.push([g.name,"","","","","",""]);
+  });
+  const wsProd = XLSX.utils.aoa_to_sheet(prodRows);
+  wsProd["!cols"] = [{wch:18},{wch:34},{wch:16},{wch:12},{wch:14},{wch:36},{wch:26}];
+  XLSX.utils.book_append_sheet(wb, wsProd, "Produkcja");
 
   const infoRows = [["Tytuł karty","Adres","Treść"]];
   ev.infoCards.forEach(c=>{ infoRows.push([c.title, c.address||"", c.body||""]); });
@@ -1157,6 +1306,22 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
         });
         pickups = Object.values(map);
       }
+      let production = null;
+      const wsP = sheetByName("Produkcja");
+      if(wsP){ used.add(wsP);
+        const all = rowsOf(wsP); const hdr = all[0]||[];
+        const c = colMap(hdr, {lista:["lista"], co:["co","pozycja","nazwa"], kto:["kto","osoba","wykonawca"], termin:["termin","deadline","data"], etap:["etap","status"], link:["link","plik","url"], nota:["notatka","uwagi"]});
+        const ix = (k,d)=> c[k]>=0 ? c[k] : d;
+        const iL=ix("lista",0), iC=ix("co",1), iK=ix("kto",2), iT=ix("termin",3), iE=ix("etap",4), iU=ix("link",5), iN=ix("nota",6);
+        const toDate = v => { if(typeof v==="number"){ const d=new Date(Math.round((v-25569)*864e5)); return d.toISOString().slice(0,10); } const t=String(v==null?"":v).trim(); const m=t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/); return m ? m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0") : t; };
+        const map = {};
+        all.slice(1).forEach(r=>{
+          const gname = String(r[iL]||"").trim(); if(!gname) return;
+          const co = String(r[iC]||"").trim();
+          addTo(map, gname, co ? {id:uid(), co, kto:String(r[iK]||""), termin:toDate(r[iT]), etap:stageIdByName(r[iE]), link:String(r[iU]||""), notatka:String(r[iN]||"")} : null);
+        });
+        production = Object.values(map);
+      }
       const wsI = sheetByName("Informacje");
       if(wsI){ used.add(wsI);
         infoCards = [];
@@ -1182,17 +1347,18 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
         const g = Object.values(map).filter(x=>x.items.length);
         if(g.length) groups = g;
       }
-      if(groups===null && pickups===null && infoCards===null){
-        showNotice("Nie rozpoznano danych w pliku. Arkusze powinny mieć nazwy: Sprzęt, Odbiory, Informacje — albo kolumny Co / Ilość / Osoba / Notatka.");
+      if(groups===null && pickups===null && production===null && infoCards===null){
+        showNotice("Nie rozpoznano danych w pliku. Arkusze powinny mieć nazwy: Sprzęt, Odbiory, Produkcja, Informacje — albo kolumny Co / Ilość / Osoba / Notatka.");
         return;
       }
       ev.title = newTitle; ev.subtitle = newSub; ev.statuses = newStatuses;
       if(groups!==null) ev.groups = groups;
       if(pickups!==null) ev.pickups = pickups;
+      if(production!==null) ev.production = production;
       if(infoCards!==null) ev.infoCards = infoCards;
       saveState("zaimportowano dane z Excela"); render();
       const cnt = (groups||[]).reduce((a,g)=>a+g.items.length,0);
-      showNotice("Zaimportowano z Excela: "+cnt+" pozycji sprzętu"+(pickups?", "+pickups.length+" list odbioru":"")+(infoCards?", "+infoCards.length+" kart info":"")+".");
+      showNotice("Zaimportowano z Excela: "+cnt+" pozycji sprzętu"+(pickups?", "+pickups.length+" list odbioru":"")+(production?", "+production.reduce((a,g)=>a+g.items.length,0)+" pozycji produkcji":"")+(infoCards?", "+infoCards.length+" kart info":"")+".");
     }catch(err){ console.error(err); showNotice("Nie udało się wczytać pliku Excel: "+(err&&err.message?err.message:"nieznany błąd")); }
   };
   reader.readAsArrayBuffer(file);
