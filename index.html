@@ -165,6 +165,20 @@
   .move-select{flex:1;min-width:0;}
   .group-move{display:inline-flex;gap:3px;margin-right:6px;vertical-align:middle;}
   .group-move .mv{border:1px solid var(--line);background:transparent;color:inherit;border-radius:6px;width:30px;height:26px;cursor:pointer;padding:0;}
+  .items{min-height:6px;}
+  body.edit-mode .items{min-height:44px;}
+  .drag-handle{flex:none;display:flex;align-items:center;justify-content:center;width:30px;min-height:40px;margin:-2px 0;
+    font-size:20px;line-height:1;color:var(--muted);border:1px dashed var(--line);border-radius:8px;cursor:grab;
+    touch-action:none;user-select:none;-webkit-user-select:none;}
+  .drag-handle:active{cursor:grabbing;}
+  .drag-ghost{opacity:.4;background:var(--soft);}
+  .drag-chosen{box-shadow:0 6px 18px rgba(0,0,0,.18);background:var(--paper);}
+  .stay-badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:3px;margin-left:4px;
+    background:var(--soft);color:var(--amber-deep);border:1px solid var(--line);}
+  .stay-select{flex:1;min-width:0;}
+  .stay-check{display:flex;align-items:center;gap:6px;flex-basis:100%;font-size:13px;color:var(--ink);cursor:pointer;}
+  .stay-check input{width:18px;height:18px;margin:0;}
+  .stay-info{font-size:12.5px;color:var(--amber-deep);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:0 0 .7rem;}
   .status-badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:3px;color:#fff;}
   .status-select{flex:1;min-width:0;}
   .status-editor{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:12px;}
@@ -283,6 +297,7 @@
       <button type="button" class="filter-chip" data-filter="unclear">Do ustalenia</button>
     </div>
     <select class="field" id="personFilter" style="margin:0 0 .8rem;"></select>
+    <p class="stay-info" id="stayInfo" style="display:none;"></p>
     <div id="equipmentGroups"></div>
     <div class="edit-only"><button class="btn" id="addGroupBtn">+ Dodaj magazyn</button></div>
     <div class="edit-only status-editor" id="statusEditor"></div>
@@ -345,6 +360,7 @@
 <button type="button" id="editFloat" aria-label="Tryb edycji">✎ Edytuj</button>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
@@ -403,6 +419,7 @@ let editMode = false;
 let phase = "load"; // "load" = załadunek (checked), "unload" = rozładunek (checkedReturn)
 let equipmentFilter = "all"; // "all" | "unchecked" | "unclear"
 let personFilter = "all";
+let dragging = false;
 
 function attachLiveSync(ev){
   if(liveRefs[ev.id]) return;
@@ -414,7 +431,7 @@ function attachLiveSync(ev){
       val.id = ev.id;
       normalizeEvent(val);
       const focusEl = document.activeElement;
-      const typing = state.currentId===ev.id && focusEl && (focusEl.tagName==="INPUT" || focusEl.tagName==="TEXTAREA");
+      const typing = state.currentId===ev.id && (dragging || (focusEl && (focusEl.tagName==="INPUT" || focusEl.tagName==="TEXTAREA")));
       if(typing){
         // nie nadpisuj danych pod palcami piszącej osoby — zastosuj dopiero po opuszczeniu pola
         deferredSnapshots.set(ev.id, val);
@@ -533,7 +550,7 @@ function updateProgress(){
   const ev = currentEvent();
   if(!ev) return;
   const field = checkedField();
-  const items = ev.groups.flatMap(g=>g.items).map(it=>!!it[field])
+  const items = ev.groups.flatMap(g=>g.items).filter(it=>!(field==="checkedReturn" && it.zostaje)).map(it=>!!it[field])
     .concat(ev.pickups.flatMap(g=>g.items).map(it=>!!it.checked));
   const total = items.length, checked = items.filter(Boolean).length;
   const pct = total ? Math.round(checked/total*100) : 0;
@@ -591,6 +608,7 @@ function render(){
 }
 
 function matchesEquipmentFilter(item, field){
+  if(field==="checkedReturn" && item.zostaje) return false;
   if(personFilter!=="all" && (item.gdzie||"").trim()!==personFilter) return false;
   if(equipmentFilter==="unchecked") return !item[field];
   if(equipmentFilter==="unclear") return (item.gdzie||"").indexOf("?")!==-1;
@@ -624,6 +642,13 @@ function renderGroups(){
   wrap.innerHTML = "";
   const ev = currentEvent();
   const field = checkedField();
+  const stayCount = ev.groups.reduce((a,g)=>a+g.items.filter(it=>it.zostaje).length,0);
+  const stayInfo = document.getElementById("stayInfo");
+  if(stayInfo){
+    const show = !editMode && phase==="unload" && stayCount>0;
+    stayInfo.style.display = show ? "block" : "none";
+    if(show) stayInfo.textContent = "🎁 "+stayCount+" poz. zostaje na evencie, więc nie ma ich na liście rozładunku.";
+  }
   ev.groups.forEach((grp)=>{
     const itemsToShow = editMode ? grp.items : grp.items.filter(it=>matchesEquipmentFilter(it, field));
     if(!editMode && itemsToShow.length===0) return;
@@ -642,7 +667,8 @@ function renderGroups(){
       left.appendChild(inp);
     } else { left.textContent = grp.name; }
     const count = document.createElement("span"); count.className = "group-count";
-    count.textContent = editMode ? grp.items.length : (itemsToShow.length===grp.items.length ? itemsToShow.length : itemsToShow.length+"/"+grp.items.length);
+    const baseTotal = field==="checkedReturn" ? grp.items.filter(it=>!it.zostaje).length : grp.items.length;
+    count.textContent = editMode ? grp.items.length : (itemsToShow.length===baseTotal ? itemsToShow.length : itemsToShow.length+"/"+baseTotal);
     left.appendChild(count);
     summary.appendChild(left);
 
@@ -658,8 +684,9 @@ function renderGroups(){
     summary.appendChild(right);
     det.appendChild(summary);
 
+    const list = document.createElement("div"); list.className = "items"; list.dataset.gid = grp.id; det.appendChild(list);
     itemsToShow.forEach(item=>{
-      const row = document.createElement("div");
+      const row = document.createElement("div"); row.dataset.id = item.id;
       row.className = "item-row" + (item[field] ? " checked" : "");
       const unclear = (item.gdzie||"").indexOf("?")!==-1;
 
@@ -686,12 +713,15 @@ function renderGroups(){
         const line4 = document.createElement("div"); line4.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
         const lbl4 = document.createElement("span"); lbl4.className="meta"; lbl4.textContent="Status:"; lbl4.style.margin="0";
         line4.appendChild(lbl4); line4.appendChild(statusSelect(ev, item));
+        const line5 = document.createElement("div"); line5.style.cssText="display:flex;gap:6px;margin-top:6px;align-items:center;";
+        const lbl5 = document.createElement("span"); lbl5.className="meta"; lbl5.textContent="Po evencie:"; lbl5.style.margin="0";
+        line5.appendChild(lbl5); line5.appendChild(staySelect(item));
 
         const noteInp = document.createElement("input"); noteInp.className = "field"; noteInp.value = item.notatka||""; noteInp.placeholder = "Notatka (opcjonalnie)";
         noteInp.addEventListener("input", ()=>{ item.notatka = noteInp.value; saveState(); });
         noteInp.addEventListener("blur", ()=>{ saveState("zmieniono notatkę przy: "+item.co); });
-        txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(line4); txt.appendChild(noteInp);
-        row.appendChild(moveBtns(grp.items, item.id, item.co, ()=>{ saveState("zmieniono kolejność: "+item.co); render(); }));
+        txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(line4); txt.appendChild(line5); txt.appendChild(noteInp);
+        row.appendChild(dragHandle(item.co));
         row.appendChild(txt); row.appendChild(del);
       } else {
         const box = document.createElement("input"); box.type = "checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
@@ -703,12 +733,14 @@ function renderGroups(){
         let html = '<span class="co">'+escapeHtml(item.co)+(Number(qty)!==1 ? '<span class="qty-badge">×'+escapeHtml(String(qty))+'</span>' : '')+'</span>';
         if(item.gdzie) html += '<span class="meta">'+escapeHtml(item.gdzie)+(unclear?' · do ustalenia':'')+'</span>';
         html += statusBadgeHtml(ev, item);
+        if(item.zostaje) html += '<span class="stay-badge">🎁 zostaje na evencie</span>';
         if(item.notatka) html += '<span class="note">📝 '+escapeHtml(item.notatka)+'</span>';
         txt.innerHTML = html;
         row.appendChild(box); row.appendChild(txt);
       }
-      det.appendChild(row);
+      list.appendChild(row);
     });
+    if(editMode) makeSortable(list, "equip", ()=>currentEvent().groups);
 
     if(editMode){
       const addLabel = document.createElement("p"); addLabel.className = "add-label"; addLabel.textContent = "Nowa pozycja";
@@ -718,15 +750,17 @@ function renderGroups(){
       const gdzieI = document.createElement("input"); gdzieI.className="field"; gdzieI.placeholder="Osoba";
       const iloscI = document.createElement("input"); iloscI.className="field qty-input"; iloscI.type="number"; iloscI.min="1"; iloscI.placeholder="Ilość"; iloscI.value="1";
       const notatkaI = document.createElement("input"); notatkaI.className="field"; notatkaI.placeholder="Notatka (opcjonalnie)"; notatkaI.style.flexBasis="100%";
+      const stayL = document.createElement("label"); stayL.className = "stay-check"; const stayI = document.createElement("input"); stayI.type = "checkbox";
+      stayL.appendChild(stayI); stayL.appendChild(document.createTextNode("🎁 zostaje na evencie (nie wraca na magazyn)"));
       const addBtn = document.createElement("button"); addBtn.type="button"; addBtn.className="btn primary"; addBtn.textContent="Dodaj";
-      addRow.appendChild(coI); addRow.appendChild(gdzieI); addRow.appendChild(iloscI); addRow.appendChild(notatkaI); addRow.appendChild(addBtn);
+      addRow.appendChild(coI); addRow.appendChild(gdzieI); addRow.appendChild(iloscI); addRow.appendChild(notatkaI); addRow.appendChild(stayL); addRow.appendChild(addBtn);
       det.appendChild(addRow);
       const errMsg = document.createElement("p"); errMsg.className = "add-error-msg"; errMsg.textContent = "Wpisz nazwę przedmiotu w polu \"Co\", zanim dodasz.";
       det.appendChild(errMsg);
       addBtn.addEventListener("click", ()=>{
         if(!Number.isSafeInteger(Number(iloscI.value)) || Number(iloscI.value)<1){ showNotice("Ilość musi być dodatnią liczbą całkowitą."); iloscI.focus(); return; }
         if(!coI.value.trim()){ coI.classList.add("error"); errMsg.classList.add("show"); coI.focus(); return; }
-        grp.items.push({id:uid(), co:coI.value.trim(), gdzie:gdzieI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:notatkaI.value.trim(), checked:false, checkedReturn:false});
+        grp.items.push({id:uid(), co:coI.value.trim(), gdzie:gdzieI.value.trim(), ilosc:iloscI.value?Number(iloscI.value):1, notatka:notatkaI.value.trim(), checked:false, checkedReturn:false, zostaje:stayI.checked});
         saveState("dodano: "+coI.value.trim()); render();
       });
       coI.addEventListener("input", ()=>{ coI.classList.remove("error"); errMsg.classList.remove("show"); });
@@ -761,8 +795,9 @@ function renderPickups(){
     } else { if(!isReadOnly) right.appendChild(tileEditBtn()); const chev=document.createElement("span"); chev.className="chev"; chev.textContent="›"; right.appendChild(chev); }
     summary.appendChild(right); det.appendChild(summary);
 
+    const list = document.createElement("div"); list.className = "items"; list.dataset.gid = grp.id; det.appendChild(list);
     grp.items.forEach(item=>{
-      const row = document.createElement("div"); row.className = "item-row" + (item.checked ? " checked" : "");
+      const row = document.createElement("div"); row.dataset.id = item.id; row.className = "item-row" + (item.checked ? " checked" : "");
       if(editMode){
         const del = document.createElement("button"); del.type="button"; del.className="del"; del.textContent="✕"; del.style.display="inline-block";
         del.addEventListener("click", ()=>{ grp.items = grp.items.filter(it=>it.id!==item.id); saveState("usunięto: "+item.text); render(); });
@@ -785,7 +820,7 @@ function renderPickups(){
         const lbl4 = document.createElement("span"); lbl4.className="meta"; lbl4.textContent="Status:"; lbl4.style.margin="0";
         line4.appendChild(lbl4); line4.appendChild(statusSelect(ev, item));
         txt.appendChild(textInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(line4); txt.appendChild(noteInp);
-        row.appendChild(moveBtns(grp.items, item.id, item.text, ()=>{ saveState("zmieniono kolejność: "+item.text); render(); }));
+        row.appendChild(dragHandle(item.text));
         row.appendChild(txt); row.appendChild(del);
       } else {
         const box = document.createElement("input"); box.type="checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
@@ -800,8 +835,9 @@ function renderPickups(){
         txt.innerHTML = html;
         row.appendChild(box); row.appendChild(txt);
       }
-      det.appendChild(row);
+      list.appendChild(row);
     });
+    if(editMode) makeSortable(list, "pickups", ()=>currentEvent().pickups);
 
     if(editMode){
       const addLabel = document.createElement("p"); addLabel.className = "add-label"; addLabel.textContent = "Nowa pozycja";
@@ -868,6 +904,45 @@ function moveBtns(arr, id, label, onDone){
     box.appendChild(b);
   });
   return box;
+}
+function dragHandle(label){
+  const h = document.createElement("span"); h.className = "drag-handle"; h.textContent = "⠿";
+  h.title = "Przytrzymaj i przeciągnij, żeby przesunąć"; h.setAttribute("aria-label", "Przeciągnij: "+(label||""));
+  return h;
+}
+function makeSortable(list, name, getLists){
+  if(typeof Sortable==="undefined") return;
+  Sortable.create(list, {
+    group: name, handle: ".drag-handle", draggable: ".item-row", animation: 150,
+    ghostClass: "drag-ghost", chosenClass: "drag-chosen", fallbackOnBody: true, scroll: true, bubbleScroll: true,
+    onStart(){ dragging = true; },
+    onEnd(evt){
+      dragging = false;
+      const lists = getLists();
+      const from = lists.find(l=>l.id===evt.from.dataset.gid);
+      const to = lists.find(l=>l.id===evt.to.dataset.gid);
+      if(!from || !to){ render(); return; }
+      if(from===to && evt.oldIndex===evt.newIndex){ applyDeferred(); return; }
+      const idx = from.items.findIndex(it=>it.id===evt.item.dataset.id);
+      if(idx<0){ render(); return; }
+      const moved = from.items.splice(idx,1)[0];
+      to.items.splice(Math.min(evt.newIndex, to.items.length), 0, moved);
+      const label = moved.co || moved.text || "";
+      saveState(from===to ? "zmieniono kolejność: "+label : "przeniesiono "+label+" → "+to.name);
+      render();
+    }
+  });
+}
+function staySelect(item){
+  const sel = document.createElement("select"); sel.className = "field stay-select"; sel.title = "Co dzieje się z pozycją po evencie";
+  [["", "↩️ wraca na magazyn"], ["1", "🎁 zostaje na evencie"]].forEach(([v,t])=>{
+    const o = document.createElement("option"); o.value = v; o.textContent = t; if((item.zostaje?"1":"")===v) o.selected = true; sel.appendChild(o);
+  });
+  sel.addEventListener("change", ()=>{
+    item.zostaje = sel.value==="1";
+    saveState((item.zostaje ? "zostaje na evencie: " : "wraca na magazyn: ")+item.co);
+  });
+  return sel;
 }
 function moveSelect(lists, fromList, item, label, histTxt){
   const sel = document.createElement("select"); sel.className = "field move-select"; sel.title = "Przenieś do innej listy";
@@ -998,13 +1073,13 @@ document.getElementById("exportBtn").addEventListener("click", ()=>{
   wsSettings["!cols"] = [{wch:14},{wch:40}];
   XLSX.utils.book_append_sheet(wb, wsSettings, "Ustawienia");
 
-  const sprzetRows = [["Magazyn","Co","Osoba","Ilość","Notatka","Zaladunek","Rozladunek","Status"]];
+  const sprzetRows = [["Magazyn","Co","Osoba","Ilość","Notatka","Zaladunek","Rozladunek","Status","Po evencie"]];
   ev.groups.forEach(g=>{
-    g.items.forEach(it=>{ sprzetRows.push([g.name, it.co, it.gdzie||"", (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.notatka||"", it.checked?"tak":"nie", it.checkedReturn?"tak":"nie", (statusOf(ev,it)||{}).name||""]); });
+    g.items.forEach(it=>{ sprzetRows.push([g.name, it.co, it.gdzie||"", (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.notatka||"", it.checked?"tak":"nie", it.checkedReturn?"tak":"nie", (statusOf(ev,it)||{}).name||"", it.zostaje?"zostaje":"wraca"]); });
     if(g.items.length===0) sprzetRows.push([g.name,"","","","","",""]);
   });
   const wsSprzet = XLSX.utils.aoa_to_sheet(sprzetRows);
-  wsSprzet["!cols"] = [{wch:18},{wch:36},{wch:20},{wch:8},{wch:26},{wch:10},{wch:10},{wch:18}];
+  wsSprzet["!cols"] = [{wch:18},{wch:36},{wch:20},{wch:8},{wch:26},{wch:10},{wch:10},{wch:18},{wch:12}];
   XLSX.utils.book_append_sheet(wb, wsSprzet, "Sprzęt");
 
   const odbioryRows = [["Lista","Pozycja","Ilość","Notatka","Zaznaczone"]];
@@ -1057,14 +1132,14 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
       const wsS = sheetByName("Sprzęt");
       if(wsS){ used.add(wsS);
         const all = rowsOf(wsS); const hdr = all[0]||[];
-        const c = colMap(hdr, {mag:["magazyn"], co:["co","pozycja","nazwa"], osoba:["osoba","gdzie"], ilosc:["ilosc","ile","szt"], nota:["notatka","uwagi"], zal:["zaladunek"], roz:["rozladunek"], st:["status"]});
+        const c = colMap(hdr, {mag:["magazyn"], co:["co","pozycja","nazwa"], osoba:["osoba","gdzie"], ilosc:["ilosc","ile","szt"], nota:["notatka","uwagi"], zal:["zaladunek"], roz:["rozladunek"], st:["status"], po:["po evencie","po wydarzeniu","zostaje"]});
         const ix = (k,d)=> c[k]>=0 ? c[k] : d;
-        const iM=ix("mag",0), iC=ix("co",1), iO=ix("osoba",2), iQ=ix("ilosc",3), iN=ix("nota",4), iZ=ix("zal",5), iR=ix("roz",6), iS=ix("st",7);
+        const iM=ix("mag",0), iC=ix("co",1), iO=ix("osoba",2), iQ=ix("ilosc",3), iN=ix("nota",4), iZ=ix("zal",5), iR=ix("roz",6), iS=ix("st",7), iP=ix("po",8);
         const map = {};
         all.slice(1).forEach(r=>{
           const gname = String(r[iM]||"").trim(); if(!gname) return;
           const co = String(r[iC]||"").trim();
-          addTo(map, gname, co ? {id:uid(), co, gdzie:String(r[iO]||""), ilosc:num(r[iQ]), notatka:String(r[iN]||""), checked:isChecked(r[iZ]), checkedReturn:isChecked(r[iR]), status:statusIdByName(r[iS])} : null);
+          addTo(map, gname, co ? {id:uid(), co, gdzie:String(r[iO]||""), ilosc:num(r[iQ]), notatka:String(r[iN]||""), checked:isChecked(r[iZ]), checkedReturn:isChecked(r[iR]), status:statusIdByName(r[iS]), zostaje:norm(r[iP]).startsWith("zost")} : null);
         });
         groups = Object.values(map);
       }
@@ -1129,10 +1204,10 @@ document.getElementById("warehouseBtn").addEventListener("click", ()=>{
   const ev = currentEvent();
   const wb = XLSX.utils.book_new();
   ev.groups.forEach(g=>{
-    const rows = [["Co","Ilość","Osoba","Notatka","Status"]];
-    g.items.forEach(it=>{ rows.push([it.co, (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.gdzie||"", it.notatka||"", (statusOf(ev,it)||{}).name||""]); });
+    const rows = [["Co","Ilość","Osoba","Notatka","Status","Po evencie"]];
+    g.items.forEach(it=>{ rows.push([it.co, (it.ilosc==null||it.ilosc==="")?1:it.ilosc, it.gdzie||"", it.notatka||"", (statusOf(ev,it)||{}).name||"", it.zostaje?"zostaje":"wraca"]); });
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{wch:38},{wch:8},{wch:20},{wch:30},{wch:18}];
+    ws["!cols"] = [{wch:38},{wch:8},{wch:20},{wch:30},{wch:18},{wch:12}];
     const safeName = (g.name||"Magazyn").replace(/[\\\/\?\*\[\]:]/g,"_").slice(0,31) || "Magazyn";
     XLSX.utils.book_append_sheet(wb, ws, safeName);
   });
@@ -1325,19 +1400,19 @@ document.getElementById("closeHistoryBtn").addEventListener("click", ()=>history
 historyModal.addEventListener("click", (e)=>{ if(e.target===historyModal) historyModal.classList.remove("show"); });
 
 // ---------------- init ----------------
-document.addEventListener("focusout", ()=>{
-  setTimeout(()=>{
-    const el = document.activeElement;
-    if(el && (el.tagName==="INPUT" || el.tagName==="TEXTAREA")) return;
-    const id = state.currentId;
-    if(deferredSnapshots.has(id) && !pushTimers.has(id)){
-      state.events[id] = deferredSnapshots.get(id);
-      deferredSnapshots.delete(id);
-      saveLocalOnly();
-      render();
-    }
-  }, 0);
-});
+function applyDeferred(){
+  if(dragging) return;
+  const el = document.activeElement;
+  if(el && (el.tagName==="INPUT" || el.tagName==="TEXTAREA")) return;
+  const id = state.currentId;
+  if(deferredSnapshots.has(id) && !pushTimers.has(id)){
+    state.events[id] = deferredSnapshots.get(id);
+    deferredSnapshots.delete(id);
+    saveLocalOnly();
+    render();
+  }
+}
+document.addEventListener("focusout", ()=>{ setTimeout(applyDeferred, 0); });
 
 (function init(){
   loadTheme();
