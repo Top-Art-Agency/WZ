@@ -182,6 +182,11 @@
   .prod-meta-late{color:var(--red);font-weight:700;}
   .prod-link{display:inline-block;font-size:12.5px;font-weight:700;margin-top:3px;text-decoration:none;border-bottom:2px solid var(--lime);}
   .prod-badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:3px;color:#fff;}
+  .txt.tap-edit{cursor:pointer;border-radius:6px;}
+  .txt.tap-edit:hover .co{text-decoration:underline dotted;text-underline-offset:3px;}
+  .item-row.checked .txt.tap-edit:hover .co{text-decoration:line-through;}
+  .item-row.row-editing{background:var(--soft);box-shadow:inset 3px 0 0 var(--green);}
+  .row-done{margin-top:8px;}
   .status-badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-top:3px;color:#fff;}
   .status-select{flex:1;min-width:0;}
   .status-editor{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:12px;}
@@ -431,6 +436,7 @@ let phase = "load"; // "load" = załadunek (checked), "unload" = rozładunek (ch
 let equipmentFilter = "all"; // "all" | "unchecked" | "unclear"
 let personFilter = "all";
 let dragging = false;
+let editingItemId = null; // edycja pojedynczej pozycji (kliknięcie w nazwę)
 
 function attachLiveSync(ev){
   if(liveRefs[ev.id]) return;
@@ -662,7 +668,7 @@ function renderGroups(){
     if(show) stayInfo.textContent = "🎁 "+stayCount+" poz. zostaje na evencie, więc nie ma ich na liście rozładunku.";
   }
   ev.groups.forEach((grp)=>{
-    const itemsToShow = editMode ? grp.items : grp.items.filter(it=>matchesEquipmentFilter(it, field));
+    const itemsToShow = editMode ? grp.items : grp.items.filter(it=>it.id===editingItemId || matchesEquipmentFilter(it, field));
     if(!editMode && itemsToShow.length===0) return;
 
     const det = document.createElement("details");
@@ -702,7 +708,9 @@ function renderGroups(){
       row.className = "item-row" + (item[field] ? " checked" : "");
       const unclear = (item.gdzie||"").indexOf("?")!==-1;
 
-      if(editMode){
+      const rowEdit = editMode || editingItemId===item.id;
+      if(rowEdit){
+        if(!editMode) row.classList.add("row-editing");
         const del = document.createElement("button"); del.type="button"; del.className = "del"; del.textContent = "✕"; del.style.display = "inline-block";
         del.addEventListener("click", ()=>{ grp.items = grp.items.filter(it=>it.id!==item.id); saveState("usunięto: "+item.co); render(); });
 
@@ -733,8 +741,8 @@ function renderGroups(){
         noteInp.addEventListener("input", ()=>{ item.notatka = noteInp.value; saveState(); });
         noteInp.addEventListener("blur", ()=>{ saveState("zmieniono notatkę przy: "+item.co); });
         txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(line4); txt.appendChild(line5); txt.appendChild(noteInp);
-        row.appendChild(dragHandle(item.co));
-        row.appendChild(txt); row.appendChild(del);
+        if(editMode) row.appendChild(dragHandle(item.co));
+        row.appendChild(txt); row.appendChild(del); if(!editMode) addRowDone(txt, item.id);
       } else {
         const box = document.createElement("input"); box.type = "checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
         box.checked = !!item[field];
@@ -748,7 +756,7 @@ function renderGroups(){
         if(item.zostaje) html += '<span class="stay-badge">🎁 zostaje na evencie</span>';
         if(item.notatka) html += '<span class="note">📝 '+escapeHtml(item.notatka)+'</span>';
         txt.innerHTML = html;
-        row.appendChild(box); row.appendChild(txt);
+        row.appendChild(box); row.appendChild(txt); makeTapEditable(row, txt, item.id);
       }
       list.appendChild(row);
     });
@@ -810,7 +818,9 @@ function renderPickups(){
     const list = document.createElement("div"); list.className = "items"; list.dataset.gid = grp.id; det.appendChild(list);
     grp.items.forEach(item=>{
       const row = document.createElement("div"); row.dataset.id = item.id; row.className = "item-row" + (item.checked ? " checked" : "");
-      if(editMode){
+      const rowEdit = editMode || editingItemId===item.id;
+      if(rowEdit){
+        if(!editMode) row.classList.add("row-editing");
         const del = document.createElement("button"); del.type="button"; del.className="del"; del.textContent="✕"; del.style.display="inline-block";
         del.addEventListener("click", ()=>{ grp.items = grp.items.filter(it=>it.id!==item.id); saveState("usunięto: "+item.text); render(); });
         const txt = document.createElement("div"); txt.className="txt";
@@ -832,8 +842,8 @@ function renderPickups(){
         const lbl4 = document.createElement("span"); lbl4.className="meta"; lbl4.textContent="Status:"; lbl4.style.margin="0";
         line4.appendChild(lbl4); line4.appendChild(statusSelect(ev, item));
         txt.appendChild(textInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(line4); txt.appendChild(noteInp);
-        row.appendChild(dragHandle(item.text));
-        row.appendChild(txt); row.appendChild(del);
+        if(editMode) row.appendChild(dragHandle(item.text));
+        row.appendChild(txt); row.appendChild(del); if(!editMode) addRowDone(txt, item.id);
       } else {
         const box = document.createElement("input"); box.type="checkbox"; box.setAttribute("data-count","1"); box.disabled = isReadOnly;
         box.checked = !!item.checked;
@@ -845,7 +855,7 @@ function renderPickups(){
         html += statusBadgeHtml(ev, item);
         if(item.notatka) html += '<span class="note">📝 '+escapeHtml(item.notatka)+'</span>';
         txt.innerHTML = html;
-        row.appendChild(box); row.appendChild(txt);
+        row.appendChild(box); row.appendChild(txt); makeTapEditable(row, txt, item.id);
       }
       list.appendChild(row);
     });
@@ -921,7 +931,9 @@ function renderProduction(){
     grp.items.forEach(item=>{
       const isDone = item.etap==="done";
       const row = document.createElement("div"); row.dataset.id = item.id; row.className = "item-row" + (isDone ? " checked" : "");
-      if(editMode){
+      const rowEdit = editMode || editingItemId===item.id;
+      if(rowEdit){
+        if(!editMode) row.classList.add("row-editing");
         const del = document.createElement("button"); del.type="button"; del.className="del"; del.textContent="✕"; del.style.display="inline-block";
         del.addEventListener("click", ()=>{ grp.items = grp.items.filter(it=>it.id!==item.id); saveState("usunięto z produkcji: "+item.co); render(); });
         const txt = document.createElement("div"); txt.className="txt";
@@ -951,7 +963,7 @@ function renderProduction(){
         noteInp.addEventListener("input", ()=>{ item.notatka = noteInp.value; saveState(); });
         noteInp.addEventListener("blur", ()=>{ saveState("zmieniono notatkę przy: "+item.co); });
         txt.appendChild(coInp); txt.appendChild(line2); txt.appendChild(line3); txt.appendChild(line4); txt.appendChild(linkInp); txt.appendChild(noteInp);
-        row.appendChild(dragHandle(item.co)); row.appendChild(txt); row.appendChild(del);
+        if(editMode) row.appendChild(dragHandle(item.co)); row.appendChild(txt); row.appendChild(del); if(!editMode) addRowDone(txt, item.id);
       } else {
         const box = document.createElement("input"); box.type="checkbox"; box.disabled = isReadOnly; box.checked = isDone;
         box.setAttribute("aria-label", "Gotowe: " + item.co);
@@ -970,7 +982,7 @@ function renderProduction(){
         txt.innerHTML = html;
         const url = safeUrl(item.link);
         if(url){ const a = document.createElement("a"); a.className="prod-link"; a.href=url; a.target="_blank"; a.rel="noopener"; a.textContent="Otwórz plik ↗"; const br=document.createElement("br"); txt.appendChild(br); txt.appendChild(a); }
-        row.appendChild(box); row.appendChild(txt);
+        row.appendChild(box); row.appendChild(txt); makeTapEditable(row, txt, item.id);
       }
       list.appendChild(row);
     });
@@ -1006,7 +1018,7 @@ function renderInfoCards(){
   wrap.innerHTML = "";
   const ev = currentEvent();
   ev.infoCards.forEach(card=>{
-    const div = document.createElement("div"); div.className = "info-card";
+    const div = document.createElement("div"); div.className = "info-card"; div.dataset.id = card.id;
     if(editMode){
       const rm = document.createElement("button"); rm.type="button"; rm.className="remove-card"; rm.textContent="✕";
       rm.addEventListener("click", ()=>{ ev.infoCards = ev.infoCards.filter(c=>c.id!==card.id); saveState("usunięto kartę: "+card.title); render(); });
@@ -1030,8 +1042,79 @@ function renderInfoCards(){
 }
 
 // ---------------- event handlers: header controls ----------------
-document.getElementById("editToggle").addEventListener("click", ()=>{ editMode = !editMode; render(); });
-document.getElementById("editFloat").addEventListener("click", ()=>{ editMode = !editMode; render(); });
+// ---- przełączanie edycji bez skakania strony: zapamiętaj element widoczny na ekranie i wróć do niego po przebudowie ----
+function stickyOffset(){
+  const nav = document.querySelector("nav.chips");
+  if(nav && getComputedStyle(nav).position==="sticky") return Math.max(0, nav.getBoundingClientRect().bottom);
+  return 0;
+}
+function anchorKeys(el){
+  const keys = [];
+  if(el.matches(".item-row[data-id]")) keys.push(".item-row[data-id=\""+el.dataset.id+"\"]");
+  if(el.matches(".info-card[data-id]")) keys.push(".info-card[data-id=\""+el.dataset.id+"\"]");
+  const det = el.closest("details[data-open-key]");
+  if(det) keys.push("details[data-open-key=\""+det.dataset.openKey+"\"] > summary");
+  const sec = el.closest("section[id]");
+  if(sec) keys.push("section#"+sec.id);
+  return keys;
+}
+function captureAnchor(preferEl){
+  let el = preferEl || null;
+  if(!el){
+    const th = stickyOffset();
+    const cands = Array.from(document.querySelectorAll(".item-row[data-id], .info-card[data-id], summary.group-head, section[id] > h2"));
+    el = cands.find(c=>{ const r=c.getBoundingClientRect(); return r.height>0 && r.top >= th-4; })
+      || cands.find(c=>{ const r=c.getBoundingClientRect(); return r.height>0 && r.bottom > th; });
+  }
+  if(!el) return null;
+  return { keys: anchorKeys(el), top: el.getBoundingClientRect().top };
+}
+function restoreAnchor(a){
+  if(!a) return;
+  for(const k of a.keys){
+    let target = null;
+    try{ target = document.querySelector(k); }catch(e){}
+    if(target && target.getBoundingClientRect().height>0){
+      window.scrollBy({ top: target.getBoundingClientRect().top - a.top, left: 0, behavior: "instant" });
+      return;
+    }
+  }
+}
+function startItemEdit(id, row){
+  const a = captureAnchor(row);
+  editingItemId = id;
+  render();
+  restoreAnchor(a);
+  const first = document.querySelector('.item-row[data-id="'+id+'"] input.field');
+  if(first){ try{ first.focus({preventScroll:true}); }catch(e){ first.focus(); } }
+}
+function stopItemEdit(){
+  if(!editingItemId) return;
+  const row = document.querySelector('.item-row[data-id="'+editingItemId+'"]');
+  const a = captureAnchor(row);
+  editingItemId = null;
+  render();
+  restoreAnchor(a);
+}
+function makeTapEditable(row, txt, id){
+  if(isReadOnly) return;
+  txt.classList.add("tap-edit"); txt.title = "Kliknij, żeby edytować";
+  txt.addEventListener("click", e=>{ if(e.target.closest("a")) return; startItemEdit(id, row); });
+}
+function addRowDone(txt, id){
+  const b = document.createElement("button"); b.type = "button"; b.className = "btn primary row-done"; b.textContent = "✓ Gotowe";
+  b.addEventListener("click", e=>{ e.preventDefault(); stopItemEdit(); });
+  txt.appendChild(b);
+}
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && editingItemId && !editMode){ e.target.blur && e.target.blur(); stopItemEdit(); } });
+function setEditMode(on, preferEl){
+  const a = captureAnchor(preferEl);
+  editMode = on; editingItemId = null;
+  render();
+  restoreAnchor(a);
+}
+document.getElementById("editToggle").addEventListener("click", ()=>setEditMode(!editMode));
+document.getElementById("editFloat").addEventListener("click", ()=>setEditMode(!editMode));
 
 function moveBy(arr, id, d){ const i = arr.findIndex(x=>x.id===id), j = i+d; if(i<0||j<0||j>=arr.length) return false; const t=arr[i]; arr[i]=arr[j]; arr[j]=t; return true; }
 function moveBtns(arr, id, label, onDone){
@@ -1126,7 +1209,7 @@ function renderStatusEditor(){
   add.addEventListener("click", ()=>{ ev.statuses.push({id:uid(), name:"Nowy status"}); saveState("dodano status"); render(); });
   box.appendChild(add);
 }
-function tileEditBtn(){ const b=document.createElement("button"); b.type="button"; b.className="tile-edit"; b.textContent="✎"; b.title="Edytuj"; b.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); editMode=true; render(); }); return b; }
+function tileEditBtn(){ const b=document.createElement("button"); b.type="button"; b.className="tile-edit"; b.textContent="✎"; b.title="Edytuj"; b.addEventListener("click", e=>{ e.preventDefault(); e.stopPropagation(); setEditMode(true, b.closest("summary, .info-card")); }); return b; }
 document.getElementById("titleInput").addEventListener("input", e=>{ currentEvent().title = e.target.value; saveState(); document.getElementById("titleText").textContent = e.target.value; populateEventSelect(); });
 document.getElementById("titleInput").addEventListener("blur", ()=>{ saveState("zmieniono nazwę eventu: "+currentEvent().title); });
 document.getElementById("subInput").addEventListener("input", e=>{ currentEvent().subtitle = e.target.value; saveState(); document.getElementById("subText").textContent = e.target.value; });
@@ -1150,7 +1233,7 @@ document.getElementById("personFilter").addEventListener("change", (e)=>{
 });
 
 document.getElementById("eventSelect").addEventListener("change", (e)=>{
-  state.currentId = e.target.value; saveLocalOnly(); render(); updateAddressBar();
+  state.currentId = e.target.value; editingItemId = null; saveLocalOnly(); render(); updateAddressBar();
   const ev = currentEvent();
   ensureCloud(ev);
 });
